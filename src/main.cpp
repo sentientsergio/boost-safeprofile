@@ -6,7 +6,7 @@
 #include <boost/safeprofile/version.hpp>
 #include <iostream>
 
-int main(int argc, char* argv[]) {
+int main(int /*argc*/, char* /*argv*/[]) {
     std::cout << "boost-safeprofile " << boost::safeprofile::version::string << "\n";
     std::cout << "Safety Profile conformance analysis tool\n";
     return 0;
