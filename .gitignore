@@ -1,0 +1,37 @@
+# Build artifacts
+build/
+cmake-build-*/
+*.swp
+*.swo
+*~
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Compiled binaries
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+boost-safeprofile
+
+# Test outputs
+Testing/
+*.log
+
+# Evidence packs and output
+out/
+evidence/
+*.sarif
+*.jsonl
+
+# Compilation database (generated)
+compile_commands.json
+
+# OS files
+.DS_Store
+Thumbs.db
