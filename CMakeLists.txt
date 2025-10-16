@@ -35,6 +35,7 @@ add_executable(boost-safeprofile
     src/main.cpp
     src/cli/arguments.cpp
     src/intake/repository.cpp
+    src/profile/loader.cpp
 )
 
 target_include_directories(boost-safeprofile PRIVATE

@@ -5,6 +5,7 @@
 
 #include "cli/arguments.hpp"
 #include "intake/repository.hpp"
+#include "profile/loader.hpp"
 #include <iostream>
 #include <exception>
 
@@ -33,8 +34,18 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "\n";
 
-        // Placeholder: further steps will be added
-        std::cout << "[Profile loading, analysis, and output generation not yet implemented]\n";
+        // Step 2: Load profile rules
+        std::cout << "Loading profile: " << args->profile << "...\n";
+        auto rules = boost::safeprofile::profile::loader::load_profile(args->profile);
+
+        std::cout << "Loaded " << rules.size() << " rule(s):\n";
+        for (const auto& rule : rules) {
+            std::cout << "  [" << rule.id << "] " << rule.title << "\n";
+        }
+        std::cout << "\n";
+
+        // Placeholder: analysis and output generation not yet implemented
+        std::cout << "[Analysis and output generation not yet implemented]\n";
 
         return 0;
 
