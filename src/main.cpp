@@ -4,32 +4,42 @@
 // (See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt)
 
 #include "cli/arguments.hpp"
+#include "intake/repository.hpp"
 #include <iostream>
+#include <exception>
 
 int main(int argc, char* argv[]) {
-    auto args = boost::safeprofile::cli::parse_arguments(argc, argv);
+    try {
+        auto args = boost::safeprofile::cli::parse_arguments(argc, argv);
 
-    if (!args) {
-        // Help or version was shown, or parsing failed
+        if (!args) {
+            // Help or version was shown, or parsing failed
+            return 0;
+        }
+
+        std::cout << "=== Boost.SafeProfile Analysis ===\n";
+        std::cout << "Target: " << args->target_path << "\n";
+        std::cout << "Profile: " << args->profile << "\n";
+        std::cout << "Mode: " << (args->offline ? "offline" : "online") << "\n\n";
+
+        // Step 1: Intake - discover source files
+        std::cout << "Discovering C++ source files...\n";
+        boost::safeprofile::intake::repository repo(args->target_path);
+        auto sources = repo.discover_sources();
+
+        std::cout << "Found " << sources.size() << " source file(s):\n";
+        for (const auto& src : sources) {
+            std::cout << "  " << src.path.string() << "\n";
+        }
+        std::cout << "\n";
+
+        // Placeholder: further steps will be added
+        std::cout << "[Profile loading, analysis, and output generation not yet implemented]\n";
+
         return 0;
-    }
 
-    // Placeholder: actual analysis will be implemented in later steps
-    std::cout << "Analyzing: " << args->target_path << "\n";
-    std::cout << "Profile: " << args->profile << "\n";
-    std::cout << "Mode: " << (args->offline ? "offline" : "online") << "\n";
-
-    if (args->sarif_output) {
-        std::cout << "SARIF output: " << *args->sarif_output << "\n";
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
     }
-    if (args->html_output) {
-        std::cout << "HTML report: " << *args->html_output << "\n";
-    }
-    if (args->evidence_dir) {
-        std::cout << "Evidence directory: " << *args->evidence_dir << "\n";
-    }
-
-    std::cout << "\n[Analysis pipeline not yet implemented - Phase 0 stub]\n";
-
-    return 0;
 }
