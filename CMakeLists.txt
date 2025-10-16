@@ -33,6 +33,7 @@ option(BOOST_SAFEPROFILE_ENABLE_SANITIZERS "Enable sanitizers in debug builds" O
 # Core executable
 add_executable(boost-safeprofile
     src/main.cpp
+    src/cli/arguments.cpp
 )
 
 target_include_directories(boost-safeprofile PRIVATE
