@@ -7,6 +7,7 @@
 #include "intake/repository.hpp"
 #include "profile/loader.hpp"
 #include "analysis/detector.hpp"
+#include "emit/sarif.hpp"
 #include <iostream>
 #include <exception>
 
@@ -65,8 +66,14 @@ int main(int argc, char* argv[]) {
             std::cout << "No violations found! ✓\n\n";
         }
 
-        // Placeholder: SARIF output not yet implemented
-        std::cout << "[SARIF output generation not yet implemented]\n";
+        // Step 4: Generate SARIF output (if requested)
+        if (args->sarif_output) {
+            std::cout << "Generating SARIF output...\n";
+            boost::safeprofile::emit::sarif_emitter emitter;
+            auto sarif_doc = emitter.generate(findings, rules);
+            emitter.write_to_file(sarif_doc, *args->sarif_output);
+            std::cout << "SARIF written to: " << *args->sarif_output << "\n\n";
+        }
 
         return findings.empty() ? 0 : 1;  // Exit code reflects findings
 
