@@ -18,46 +18,66 @@ We **eat our own cooking**: the codebase adheres to the same Safety-Profile rule
 
 ## 2) System architecture (high level)
 
-```
-                  ┌───────────────────────────────────────────────────┐
-                  │                 CLI / SDK / API                   │
-                  └──────────────┬───────────────────────┬────────────┘
-                                 │                       │
-                      (A) Project Intake          (B) Profile Manager
-                                 │                       │
-                                 ▼                       ▼
-                       ┌────────────────┐      ┌────────────────────┐
-                       │ Repo Resolver  │      │ Profile Loader/DSL │
-                       │ + Build Disc.  │      │ (built-in + user)  │
-                       └───────┬────────┘      └──────────┬─────────┘
-                               │                          │
-                               ▼                          ▼
-                    ┌───────────────────┐       ┌──────────────────────┐
-                    │ Compilation DB    │       │ Rule Graph (facts →  │
-                    │ (compile_cmds)    │       │ detectors → actions) │
-                    └────────┬──────────┘       └──────────┬───────────┘
-                             │                              │
-                             ▼                              ▼
-                ┌──────────────────────┐          ┌──────────────────────┐
-                │ Static Facts Engine  │◄────────►│ Rule Engine           │
-                │ (Clang AST/CFG/DF)   │  facts   │ (match/severity/fix) │
-                └───────┬──────────────┘          └──────────┬───────────┘
-                        │                                     │
-                        │ findings                            │ hints
-                        ▼                                     ▼
-         ┌──────────────────────────┐            ┌──────────────────────────┐
-         │ Explainer (AI-optional) │            │ Suggestion Synth (AI-opt)│
-         │ NL rationale + context  │            │ patches / annotation diffs│
-         └──────────┬──────────────┘            └───────────┬──────────────┘
-                    │                                         │
-                    ▼                                         ▼
-           ┌─────────────────────┐                   ┌──────────────────────┐
-           │ Reports/Emitters    │◄── artifacts ────│ Evidence Packer       │
-           │ SARIF/JSON/HTML/MD  │                   │ logs, configs, hashes │
-           └────────┬────────────┘                   └──────────┬───────────┘
-                    │                                           │
-                    ▼                                           ▼
-           CI Gate / Baselines                         Archive / Auditor
+```mermaid
+graph TB
+    CLI["CLI / SDK / API"]
+
+    subgraph IntakePhase["(A) Project Intake"]
+        RepoResolver["Repo Resolver<br/>+ Build Discovery"]
+        CompDB["Compilation DB<br/>(compile_commands.json)"]
+    end
+
+    subgraph ProfilePhase["(B) Profile Manager"]
+        ProfileLoader["Profile Loader / DSL<br/>(built-in + user)"]
+        RuleGraph["Rule Graph<br/>(facts → detectors → actions)"]
+    end
+
+    subgraph AnalysisCore["Analysis Core"]
+        FactsEngine["Static Facts Engine<br/>(Clang AST/CFG/Dataflow)"]
+        RuleEngine["Rule Engine<br/>(match/severity/fix)"]
+    end
+
+    subgraph AILayers["AI-Assisted Layers (Optional)"]
+        Explainer["Explainer<br/>(NL rationale + context)"]
+        SuggestionSynth["Suggestion Synthesizer<br/>(patches / annotation diffs)"]
+    end
+
+    subgraph OutputPhase["Output & Evidence"]
+        Emitters["Reports/Emitters<br/>(SARIF/JSON/HTML/MD)"]
+        EvidencePacker["Evidence Packer<br/>(logs, configs, hashes)"]
+    end
+
+    subgraph Targets["Deployment Targets"]
+        CIGate["CI Gate / Baselines"]
+        Archive["Archive / Auditor"]
+    end
+
+    CLI --> RepoResolver
+    CLI --> ProfileLoader
+
+    RepoResolver --> CompDB
+    ProfileLoader --> RuleGraph
+
+    CompDB --> FactsEngine
+    RuleGraph --> RuleEngine
+
+    FactsEngine <--> |facts| RuleEngine
+
+    FactsEngine --> |findings| Explainer
+    RuleEngine --> |hints| SuggestionSynth
+
+    Explainer --> Emitters
+    SuggestionSynth --> EvidencePacker
+
+    Emitters --> CIGate
+    EvidencePacker --> Archive
+
+    style IntakePhase fill:#e1f5ff
+    style ProfilePhase fill:#fff4e1
+    style AnalysisCore fill:#ffe1f5
+    style AILayers fill:#f0ffe1
+    style OutputPhase fill:#ffe1e1
+    style Targets fill:#e1e1ff
 ```
 
 ---

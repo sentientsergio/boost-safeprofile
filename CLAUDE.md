@@ -211,9 +211,223 @@ boost-safeprofile/
 
 ---
 
+## Phase 0 Completion Status (2025-10-15)
+
+**Status:** ✅ **COMPLETE** - Ready for v0.0.1 release
+
+### What Was Built
+
+Phase 0 delivered a **working end-to-end MVP** demonstrating the complete analysis pipeline:
+
+```
+CLI → Intake → Profile Loading → Analysis → SARIF Output
+```
+
+### Implementation Summary
+
+**1. CLI Module** ([src/cli/](src/cli/))
+- **Files:** `arguments.hpp`, `arguments.cpp`
+- **Features:** Boost.Program_options parser with `--help`, `--version`, `--profile`, `--sarif`, `--offline/--online`
+- **Status:** Fully functional, supports all Phase 0 options
+- **Commit:** `5861168`
+
+**2. Intake Module** ([src/intake/](src/intake/))
+- **Files:** `repository.hpp`, `repository.cpp`
+- **Features:** Discovers C++ source files (`.cpp`, `.hpp`, `.cc`, `.cxx`, `.h`, `.hxx`) using Boost.Filesystem
+- **Status:** Works with local paths, recursive directory walking
+- **Commit:** `08a7eeb`
+
+**3. Profile Module** ([src/profile/](src/profile/))
+- **Files:** `rule.hpp`, `loader.hpp`, `loader.cpp`
+- **Features:** Hardcoded `core-safety` profile with one rule: `SP-OWN-001` "Naked new expression"
+- **Rule Definition:** ID, title, description, severity (blocker/major/minor/info), pattern
+- **Status:** Phase 0 stub complete, ready for expansion
+- **Commit:** `dc0819f`
+
+**4. Analysis Module** ([src/analysis/](src/analysis/))
+- **Files:** `detector.hpp`, `detector.cpp`
+- **Features:** Keyword-based pattern matching across source files
+- **Returns:** Findings with file path, line number, column number, snippet, severity
+- **Limitations:** Known false positives in comments/strings (expected for Phase 0)
+- **Status:** Working detector, self-test passing
+- **Commit:** `6550dca`
+
+**5. Emit Module** ([src/emit/](src/emit/))
+- **Files:** `sarif.hpp`, `sarif.cpp`
+- **Features:** SARIF 2.1.0 compliant output using Boost.JSON
+- **Includes:** Tool metadata, rule definitions, findings with locations
+- **Severity Mapping:** blocker→error, major→warning, minor→note, info→none
+- **Status:** Validated JSON structure, GitHub Code Scanning compatible
+- **Commit:** `a2620ae`
+
+### Self-Conformance Results
+
+**Test Command:**
+```bash
+build/boost-safeprofile --sarif self-test.sarif src/
+```
+
+**Results:**
+- **Files Analyzed:** 12 (all modules)
+- **Findings:** 4 (all false positives in comments/strings)
+- **Actual Violations:** 0
+- **Conformance:** ✅ PASS
+
+**Memory Safety Verification:**
+- ✅ No naked `new`/`delete` - all allocations use RAII
+- ✅ No owning raw pointers - `std::vector`, `std::string`, `std::optional` throughout
+- ✅ RAII for all resources - `std::ifstream`/`std::ofstream` auto-close
+- ✅ Safe APIs only - no pointer arithmetic, bounds-checked access
+
+See [SELF-TEST.md](SELF-TEST.md) for detailed analysis.
+
+### Build Configuration
+
+**CMakeLists.txt Structure:**
+- C++20 standard
+- Boost dependencies: `program_options`, `filesystem`, `json`
+- Compiler warnings as errors (`-Wall -Wextra -Werror`)
+- Sanitizers enabled in debug builds
+- Generates `compile_commands.json`
+
+**Source Files in Build:**
+```cmake
+add_executable(boost-safeprofile
+    src/main.cpp
+    src/cli/arguments.cpp
+    src/intake/repository.cpp
+    src/profile/loader.cpp
+    src/analysis/detector.cpp
+    src/emit/sarif.cpp
+)
+```
+
+### Documentation Artifacts
+
+- [README.md](README.md) - Quickstart, architecture diagram, feature overview
+- [Design.md](Design.md) - System architecture with Mermaid diagram, component descriptions
+- [Requirements.md](Requirements.md) - Problem framing, objectives, scope
+- [CLAUDE.md](CLAUDE.md) - This file, development context
+- [SELF-TEST.md](SELF-TEST.md) - Self-conformance test results
+- [PHASE-0-CHECKLIST.md](PHASE-0-CHECKLIST.md) - Complete deliverable verification
+- [docs/building.md](docs/building.md) - Build instructions
+- [docs/github-setup.md](docs/github-setup.md) - Repository setup guide
+
+### Commit History (Phase 0)
+
+1. `45a88a1` - Initial commit: Project bootstrap with CMake build system
+2. `dfbeca4` - Fix unused parameter warnings in main.cpp
+3. `5861168` - Add CLI skeleton with Boost.Program_options argument parsing
+4. `08a7eeb` - Add intake module for discovering C++ source files
+5. `dc0819f` - Add profile loader with hardcoded core-safety rule
+6. `6550dca` - Add analysis detector module with keyword-based pattern matching
+7. `a2620ae` - Add SARIF 2.1.0 output emitter for analysis results
+8. `f86d284` - Document Phase 0 completion: self-test results and checklist
+
+### Known Limitations (Phase 0 - Acceptable)
+
+These are **documented and expected** for the MVP:
+
+1. **Keyword-based detection** - Simple substring matching, will be replaced with AST analysis in Phase 1
+2. **False positives** - Matches patterns in comments, strings, identifiers (expected)
+3. **Single rule** - Only SP-OWN-001 "naked new" (more rules in Phase 1)
+4. **Local paths only** - No Git cloning yet (Phase 1)
+5. **No AI features** - Offline-only deterministic analysis (AI layers Phase 1+)
+6. **SARIF output only** - No HTML reports or evidence packs yet (Phase 1)
+7. **No baselines** - No CI baseline tracking (Phase 1)
+
+### Next Steps (Phase 1)
+
+After v0.0.1 release, Phase 1 priorities:
+
+**Core Analysis:**
+- Replace keyword matching with Clang LibTooling AST analysis
+- Add context awareness (skip comments/strings)
+- Implement multiple core-safety rules (lifetime, bounds, ownership)
+- Add CFG and dataflow analysis
+
+**Repository Operations:**
+- Git repository cloning support (`libgit2`)
+- Build discovery (`compile_commands.json` generation)
+- Multi-project workspace support
+
+**Output & Evidence:**
+- HTML report generation
+- Evidence pack creation (manifests, hashes, reproducibility)
+- CI baseline tracking and diff reporting
+
+**Testing:**
+- Unit test suite with Boost.Test
+- Integration test fixtures
+- CI/CD pipeline (GitHub Actions)
+- AddressSanitizer/UBSan/TSan in CI
+
+**Documentation:**
+- CONTRIBUTING.md
+- User guide with examples
+- Rule documentation
+- API documentation
+
+### Current Working State
+
+**Executable Location:** `build/boost-safeprofile`
+
+**Example Usage:**
+```bash
+# Analyze a project
+build/boost-safeprofile src/
+
+# Generate SARIF output
+build/boost-safeprofile --sarif output.sarif src/
+
+# Use different profile (both map to same rules in Phase 0)
+build/boost-safeprofile --profile memory-safety src/
+```
+
+**Exit Codes:**
+- `0` - No violations found (or all below threshold)
+- `1` - Violations found
+
+### Context for Future Sessions
+
+**When continuing this project:**
+
+1. **Phase 0 is complete** - All MVP deliverables done, self-test passing
+2. **Code is self-conforming** - Uses Safe C++ practices throughout
+3. **Ready for v0.0.1 tag** - Pending user approval (documentation updates in progress)
+4. **Next major work** - Phase 1: AST-based analysis, multiple rules, Git support
+5. **Architecture is stable** - Modular pipeline design proven, ready for expansion
+
+**Key Files to Reference:**
+- [PHASE-0-CHECKLIST.md](PHASE-0-CHECKLIST.md) - What was delivered
+- [SELF-TEST.md](SELF-TEST.md) - Self-conformance results
+- [Design.md](Design.md) - Architecture and component descriptions
+- [Requirements.md](Requirements.md) - Project objectives and scope
+
+**Build Commands:**
+```bash
+# Build
+cd build && cmake --build .
+
+# Run self-test
+build/boost-safeprofile --sarif test.sarif src/
+
+# View commits
+git log --oneline
+```
+
+**Technology Stack:**
+- C++20, Boost 1.82+ (program_options, filesystem, json)
+- CMake 3.20+
+- SARIF 2.1.0 output format
+- macOS/Linux/Windows compatible (currently tested on macOS)
+
+---
+
 ## Changelog
 
-- **2025-10-15:** Initial creation; captured technology stack, structure, methodology, and Phase 0 roadmap decisions.
+- **2025-10-15 (Morning):** Initial creation; captured technology stack, structure, methodology, and Phase 0 roadmap decisions.
+- **2025-10-15 (Evening):** Phase 0 completion; added implementation summary, self-conformance results, and Phase 1 roadmap. Ready for v0.0.1 release.
 
 ---
 

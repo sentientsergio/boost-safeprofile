@@ -1,6 +1,8 @@
-# README.md — Boost.SafeProfile (Candidate Tool)
+# Boost.SafeProfile
 
-> **Status:** *Candidate Boost Tool* (proposed). This repository contains a developer-facing utility intended to support **WG21 Safety Profiles** adoption in C++ projects. See `Requirements.md` for problem framing, audience, and scope.
+![Boost.SafeProfile Banner](docs/assets/banner.png)
+
+> **Status:** *Candidate Boost Tool* (proposed). This repository contains a developer-facing utility intended to support **WG21 Safety Profiles** adoption in C++ projects. See [`Requirements.md`](Requirements.md) for problem framing, audience, and scope.
 
 ---
 
@@ -73,10 +75,86 @@ boost-safeprofile analyze --online --ai-explain --ai-suggest ./path
 
 ## Typical Workflow
 
-1. **Baseline:** run on main branch, archive evidence pack  
-2. **Harden:** apply low-risk suggestions (e.g., `std::span`, `not_null`, RAII)  
-3. **Gate:** add CI step with thresholds (e.g., “no blocker findings”)  
+1. **Baseline:** run on main branch, archive evidence pack
+2. **Harden:** apply low-risk suggestions (e.g., `std::span`, `not_null`, RAII)
+3. **Gate:** add CI step with thresholds (e.g., "no blocker findings")
 4. **Prove:** attach evidence packs to releases or audits
+
+---
+
+## Architecture
+
+Boost.SafeProfile follows a modular pipeline architecture:
+
+```mermaid
+graph TB
+    CLI["CLI / SDK / API"]
+
+    subgraph IntakePhase["(A) Project Intake"]
+        RepoResolver["Repo Resolver<br/>+ Build Discovery"]
+        CompDB["Compilation DB<br/>(compile_commands.json)"]
+    end
+
+    subgraph ProfilePhase["(B) Profile Manager"]
+        ProfileLoader["Profile Loader / DSL<br/>(built-in + user)"]
+        RuleGraph["Rule Graph<br/>(facts → detectors → actions)"]
+    end
+
+    subgraph AnalysisCore["Analysis Core"]
+        FactsEngine["Static Facts Engine<br/>(Clang AST/CFG/Dataflow)"]
+        RuleEngine["Rule Engine<br/>(match/severity/fix)"]
+    end
+
+    subgraph AILayers["AI-Assisted Layers (Optional)"]
+        Explainer["Explainer<br/>(NL rationale + context)"]
+        SuggestionSynth["Suggestion Synthesizer<br/>(patches / annotation diffs)"]
+    end
+
+    subgraph OutputPhase["Output & Evidence"]
+        Emitters["Reports/Emitters<br/>(SARIF/JSON/HTML/MD)"]
+        EvidencePacker["Evidence Packer<br/>(logs, configs, hashes)"]
+    end
+
+    subgraph Targets["Deployment Targets"]
+        CIGate["CI Gate / Baselines"]
+        Archive["Archive / Auditor"]
+    end
+
+    CLI --> RepoResolver
+    CLI --> ProfileLoader
+
+    RepoResolver --> CompDB
+    ProfileLoader --> RuleGraph
+
+    CompDB --> FactsEngine
+    RuleGraph --> RuleEngine
+
+    FactsEngine <--> |facts| RuleEngine
+
+    FactsEngine --> |findings| Explainer
+    RuleEngine --> |hints| SuggestionSynth
+
+    Explainer --> Emitters
+    SuggestionSynth --> EvidencePacker
+
+    Emitters --> CIGate
+    EvidencePacker --> Archive
+
+    style IntakePhase fill:#e1f5ff
+    style ProfilePhase fill:#fff4e1
+    style AnalysisCore fill:#ffe1f5
+    style AILayers fill:#f0ffe1
+    style OutputPhase fill:#ffe1e1
+    style Targets fill:#e1e1ff
+```
+
+**Key Principles:**
+- **Static-analysis-led** with optional AI assist (never AI-dependent)
+- **Offline-first** design (no network access by default)
+- **Deterministic** pipeline (same inputs → same outputs)
+- **Modular** architecture with clear separation of concerns
+
+For detailed component descriptions and design rationale, see **[`Design.md`](Design.md)**.
 
 ---
 
