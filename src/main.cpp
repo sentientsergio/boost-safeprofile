@@ -6,6 +6,7 @@
 #include "cli/arguments.hpp"
 #include "intake/repository.hpp"
 #include "profile/loader.hpp"
+#include "analysis/detector.hpp"
 #include <iostream>
 #include <exception>
 
@@ -44,10 +45,30 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "\n";
 
-        // Placeholder: analysis and output generation not yet implemented
-        std::cout << "[Analysis and output generation not yet implemented]\n";
+        // Step 3: Run analysis
+        std::cout << "Running analysis...\n";
+        boost::safeprofile::analysis::detector det;
+        auto findings = det.analyze(sources, rules);
 
-        return 0;
+        std::cout << "Analysis complete. Found " << findings.size() << " violation(s).\n\n";
+
+        // Display findings
+        if (!findings.empty()) {
+            std::cout << "Violations:\n";
+            for (const auto& f : findings) {
+                std::cout << "  " << f.file_path.string() << ":" << f.line_number
+                          << ":" << f.column_number << " [" << f.rule_id << "]\n";
+                std::cout << "    " << f.snippet << "\n";
+            }
+            std::cout << "\n";
+        } else {
+            std::cout << "No violations found! ✓\n\n";
+        }
+
+        // Placeholder: SARIF output not yet implemented
+        std::cout << "[SARIF output generation not yet implemented]\n";
+
+        return findings.empty() ? 0 : 1;  // Exit code reflects findings
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
