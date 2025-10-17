@@ -17,6 +17,25 @@ if(Boost_FOUND)
     message(STATUS "  Libraries: ${Boost_LIBRARIES}")
 endif()
 
-# TODO: Add LLVM/Clang dependencies in later phases
-# find_package(LLVM 15 REQUIRED CONFIG)
-# find_package(Clang REQUIRED CONFIG)
+# LLVM/Clang - for AST-based analysis (Phase 1+)
+# On macOS with Homebrew, LLVM is keg-only so we need to set CMAKE_PREFIX_PATH
+if(APPLE AND EXISTS /opt/homebrew/opt/llvm)
+    set(CMAKE_PREFIX_PATH "/opt/homebrew/opt/llvm" ${CMAKE_PREFIX_PATH})
+endif()
+
+find_package(LLVM REQUIRED CONFIG)
+
+if(LLVM_FOUND)
+    message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+    message(STATUS "  LLVM_DIR: ${LLVM_DIR}")
+    message(STATUS "  LLVM_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS}")
+    message(STATUS "  LLVM_LIBRARY_DIRS: ${LLVM_LIBRARY_DIRS}")
+    message(STATUS "  LLVM_DEFINITIONS: ${LLVM_DEFINITIONS}")
+
+    # Separate LLVM definitions into compile definitions
+    separate_arguments(LLVM_DEFINITIONS_LIST NATIVE_COMMAND ${LLVM_DEFINITIONS})
+
+    # Find Clang libraries
+    find_package(Clang REQUIRED CONFIG)
+    message(STATUS "Found Clang")
+endif()

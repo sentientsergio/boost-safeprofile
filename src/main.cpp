@@ -7,6 +7,7 @@
 #include "intake/repository.hpp"
 #include "profile/loader.hpp"
 #include "analysis/detector.hpp"
+#include "analysis/ast_detector.hpp"
 #include "emit/sarif.hpp"
 #include <iostream>
 #include <exception>
@@ -46,12 +47,33 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "\n";
 
-        // Step 3: Run analysis
-        std::cout << "Running analysis...\n";
-        boost::safeprofile::analysis::detector det;
-        auto findings = det.analyze(sources, rules);
+        // Step 3: Run analysis (using AST-based detector)
+        std::cout << "Running AST-based analysis...\n";
+        boost::safeprofile::analysis::ast_detector ast_det;
 
-        std::cout << "Analysis complete. Found " << findings.size() << " violation(s).\n\n";
+        // Extract file paths from sources
+        std::vector<boost::filesystem::path> file_paths;
+        for (const auto& src : sources) {
+            file_paths.push_back(src.path);
+        }
+
+        auto ast_findings = ast_det.analyze_files(file_paths, rules);
+
+        // Convert AST findings to regular findings for compatibility
+        std::vector<boost::safeprofile::analysis::finding> findings;
+        for (const auto& af : ast_findings) {
+            findings.push_back({
+                af.rule_id,
+                af.file,
+                static_cast<int>(af.line),
+                static_cast<int>(af.column),
+                af.snippet,
+                af.severity
+            });
+        }
+
+        std::cout << "Analysis complete. Found " << findings.size() << " violation(s).\n";
+        std::cout << "(AST-based detection - no false positives in comments/strings)\n\n";
 
         // Display findings
         if (!findings.empty()) {

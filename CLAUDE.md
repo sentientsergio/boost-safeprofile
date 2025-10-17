@@ -19,18 +19,22 @@ See [README.md](./README.md), [Requirements.md](./Requirements.md), and [Design.
 ## Technology Stack (Decided 2025-10-15)
 
 ### Language & Standards
+
 - **C++20** (not C++17 or C++23)
   - Rationale: Modern productivity features (concepts, ranges, designated initializers) with widespread toolchain support
   - Minimum compilers: GCC 10+, Clang 10+, MSVC 2019+ (16.11+)
   - Target platforms: Linux, macOS, Windows
 
 ### Build System
+
 - **CMake 3.20+**
   - Industry standard, excellent Boost integration
   - Generates `compile_commands.json` for tooling
 
 ### Core Dependencies
+
 - **Boost 1.82+** (always prefer Boost libraries when options exist)
+
   - `program_options` (CLI)
   - `filesystem` (repo walking, manifests)
   - `json` (Facts IR, findings, evidence serialization)
@@ -43,12 +47,14 @@ See [README.md](./README.md), [Requirements.md](./Requirements.md), and [Design.
   - `test` (unit testing framework)
 
 - **LLVM/Clang 15+**
+
   - libtooling, clang-tidy infrastructure for AST/CFG/dataflow
 
 - **{fmt} 10+**
   - Modern formatting (potential std::format fallback)
 
 ### Deferred Dependencies (Later Phases)
+
 - `libgit2` (Git operations, Phase 1+)
 - ONNX Runtime or llama.cpp (local AI models)
 
@@ -95,6 +101,8 @@ boost-safeprofile/
 ```
 
 **Key principles:**
+
+- Intinctually pause after you develop a new source to summarize it briefly and ask me if I want a walk through.
 - Modular `src/` layout matches architecture (intake → profile → analysis → engine → emit)
 - Built-in profiles version-controlled alongside code
 - Test fixtures include sample C++ codebases for integration testing
@@ -104,11 +112,13 @@ boost-safeprofile/
 ## Development Methodology (Agreed 2025-10-15)
 
 ### Incremental Delivery
+
 - **Small, focused increments**: Each phase produces a working executable
 - **Commit early and often** with clear, descriptive messages
 - **Tag milestones**: e.g., `v0.0.1` when Phase 0 complete
 
 ### Testing Strategy
+
 - **Framework:** Boost.Test (keeps dependencies aligned)
 - **Unit tests:** Written alongside implementation, per-module coverage
 - **Integration tests:** End-to-end CLI invocations on fixture projects
@@ -119,12 +129,14 @@ boost-safeprofile/
   - Multi-platform matrix (Linux/macOS/Windows)
 
 ### Code Quality
+
 - **Clang-format:** Consistent formatting (`.clang-format` in root)
 - **Inline documentation:** Brief header comments explaining module purpose
 - **Design decisions:** Document non-obvious choices in code and/or this file
 - **Self-conformance:** Treat violations in our own code as bugs
 
 ### Documentation Hygiene
+
 - Update `docs/` as features land (not retroactively)
 - Keep README quickstart accurate
 - Add inline examples where helpful
@@ -136,6 +148,7 @@ boost-safeprofile/
 **Goal:** End-to-end "hello world" demonstrating the full pipeline with minimal functionality.
 
 ### Deliverables (Week 1-2):
+
 1. **Bootstrap:** Basic CMake + empty `main()` compiles
 2. **CLI skeleton:** Parses args, prints `--help` and `--version`
 3. **Intake stub:** Accepts local path, lists C++ files
@@ -146,6 +159,7 @@ boost-safeprofile/
 8. **Tag `v0.0.1`**
 
 **Why this order:**
+
 - Establishes end-to-end flow early
 - Validates build system and dependencies
 - Provides foundation for iterative expansion
@@ -156,28 +170,33 @@ boost-safeprofile/
 ## Key Design Constraints
 
 ### Self-Conformance (Critical)
+
 - The tool's own codebase **must** conform to a Safe C++ subset
 - No owning raw pointers; RAII everywhere; bounds-checked access
 - Unsafe constructs are CI-blocked; waivers require justification and expiry
 - Release artifacts include tool's own evidence pack (`evidence/self/`)
 
 ### Offline-First
+
 - All functionality must work fully offline (default mode)
 - AI layers are optional, pluggable, and degrade gracefully
 - No network access during analysis unless `--online` explicitly enabled
 
 ### Determinism & Reproducibility
+
 - Same inputs → same outputs (stable IDs, ordering)
 - All inputs hashed; evidence packs include `REPRO.md` with exact CLI
 - Required for audit trails and CI baselines
 
 ### Security & Privacy
+
 - Repository inputs treated as **untrusted data**
 - Parsers are fuzz targets with strict size/time limits
 - External tools invoked as sandboxed subprocesses
 - No code leaves the machine by default
 
 ### Boost-First Dependency Policy
+
 - **Always prefer Boost libraries when options exist**
 - Rationale: Alignment with Boost ecosystem, licensing consistency, quality assurance
 
@@ -226,18 +245,21 @@ CLI → Intake → Profile Loading → Analysis → SARIF Output
 ### Implementation Summary
 
 **1. CLI Module** ([src/cli/](src/cli/))
+
 - **Files:** `arguments.hpp`, `arguments.cpp`
 - **Features:** Boost.Program_options parser with `--help`, `--version`, `--profile`, `--sarif`, `--offline/--online`
 - **Status:** Fully functional, supports all Phase 0 options
 - **Commit:** `5861168`
 
 **2. Intake Module** ([src/intake/](src/intake/))
+
 - **Files:** `repository.hpp`, `repository.cpp`
 - **Features:** Discovers C++ source files (`.cpp`, `.hpp`, `.cc`, `.cxx`, `.h`, `.hxx`) using Boost.Filesystem
 - **Status:** Works with local paths, recursive directory walking
 - **Commit:** `08a7eeb`
 
 **3. Profile Module** ([src/profile/](src/profile/))
+
 - **Files:** `rule.hpp`, `loader.hpp`, `loader.cpp`
 - **Features:** Hardcoded `core-safety` profile with one rule: `SP-OWN-001` "Naked new expression"
 - **Rule Definition:** ID, title, description, severity (blocker/major/minor/info), pattern
@@ -245,6 +267,7 @@ CLI → Intake → Profile Loading → Analysis → SARIF Output
 - **Commit:** `dc0819f`
 
 **4. Analysis Module** ([src/analysis/](src/analysis/))
+
 - **Files:** `detector.hpp`, `detector.cpp`
 - **Features:** Keyword-based pattern matching across source files
 - **Returns:** Findings with file path, line number, column number, snippet, severity
@@ -253,6 +276,7 @@ CLI → Intake → Profile Loading → Analysis → SARIF Output
 - **Commit:** `6550dca`
 
 **5. Emit Module** ([src/emit/](src/emit/))
+
 - **Files:** `sarif.hpp`, `sarif.cpp`
 - **Features:** SARIF 2.1.0 compliant output using Boost.JSON
 - **Includes:** Tool metadata, rule definitions, findings with locations
@@ -263,17 +287,20 @@ CLI → Intake → Profile Loading → Analysis → SARIF Output
 ### Self-Conformance Results
 
 **Test Command:**
+
 ```bash
 build/boost-safeprofile --sarif self-test.sarif src/
 ```
 
 **Results:**
+
 - **Files Analyzed:** 12 (all modules)
 - **Findings:** 4 (all false positives in comments/strings)
 - **Actual Violations:** 0
 - **Conformance:** ✅ PASS
 
 **Memory Safety Verification:**
+
 - ✅ No naked `new`/`delete` - all allocations use RAII
 - ✅ No owning raw pointers - `std::vector`, `std::string`, `std::optional` throughout
 - ✅ RAII for all resources - `std::ifstream`/`std::ofstream` auto-close
@@ -284,6 +311,7 @@ See [SELF-TEST.md](SELF-TEST.md) for detailed analysis.
 ### Build Configuration
 
 **CMakeLists.txt Structure:**
+
 - C++20 standard
 - Boost dependencies: `program_options`, `filesystem`, `json`
 - Compiler warnings as errors (`-Wall -Wextra -Werror`)
@@ -291,6 +319,7 @@ See [SELF-TEST.md](SELF-TEST.md) for detailed analysis.
 - Generates `compile_commands.json`
 
 **Source Files in Build:**
+
 ```cmake
 add_executable(boost-safeprofile
     src/main.cpp
@@ -341,28 +370,33 @@ These are **documented and expected** for the MVP:
 After v0.0.1 release, Phase 1 priorities:
 
 **Core Analysis:**
+
 - Replace keyword matching with Clang LibTooling AST analysis
 - Add context awareness (skip comments/strings)
 - Implement multiple core-safety rules (lifetime, bounds, ownership)
 - Add CFG and dataflow analysis
 
 **Repository Operations:**
+
 - Git repository cloning support (`libgit2`)
 - Build discovery (`compile_commands.json` generation)
 - Multi-project workspace support
 
 **Output & Evidence:**
+
 - HTML report generation
 - Evidence pack creation (manifests, hashes, reproducibility)
 - CI baseline tracking and diff reporting
 
 **Testing:**
+
 - Unit test suite with Boost.Test
 - Integration test fixtures
 - CI/CD pipeline (GitHub Actions)
 - AddressSanitizer/UBSan/TSan in CI
 
 **Documentation:**
+
 - CONTRIBUTING.md
 - User guide with examples
 - Rule documentation
@@ -373,6 +407,7 @@ After v0.0.1 release, Phase 1 priorities:
 **Executable Location:** `build/boost-safeprofile`
 
 **Example Usage:**
+
 ```bash
 # Analyze a project
 build/boost-safeprofile src/
@@ -385,6 +420,7 @@ build/boost-safeprofile --profile memory-safety src/
 ```
 
 **Exit Codes:**
+
 - `0` - No violations found (or all below threshold)
 - `1` - Violations found
 
@@ -399,12 +435,14 @@ build/boost-safeprofile --profile memory-safety src/
 5. **Architecture is stable** - Modular pipeline design proven, ready for expansion
 
 **Key Files to Reference:**
+
 - [PHASE-0-CHECKLIST.md](PHASE-0-CHECKLIST.md) - What was delivered
 - [SELF-TEST.md](SELF-TEST.md) - Self-conformance results
 - [Design.md](Design.md) - Architecture and component descriptions
 - [Requirements.md](Requirements.md) - Project objectives and scope
 
 **Build Commands:**
+
 ```bash
 # Build
 cd build && cmake --build .
@@ -417,6 +455,7 @@ git log --oneline
 ```
 
 **Technology Stack:**
+
 - C++20, Boost 1.82+ (program_options, filesystem, json)
 - CMake 3.20+
 - SARIF 2.1.0 output format
@@ -431,4 +470,57 @@ git log --oneline
 
 ---
 
-*This file is a living document. Update as the project evolves.*
+_This file is a living document. Update as the project evolves._
+- **2025-10-16:** Phase 1 core complete; AST-based detection working, LLVM integrated, testing framework established, rules roadmap created.
+
+---
+
+## Phase 1 Update (2025-10-16)
+
+### What Changed
+
+**Major Milestone:** AST-based semantic analysis now replaces keyword matching
+
+**Implemented:**
+- LLVM/Clang 21.1.3 integration via CMake
+- AST detector using LibTooling and ASTMatchers
+- Boost.Test framework with 14 passing unit tests
+- SP-OWN-001 rule with zero false positives
+- Rules expansion roadmap (18+ rules planned)
+
+**Results:**
+- Self-test: **0 violations** (Phase 0 had 4 false positives)
+- Detection method: Semantic AST analysis
+- Precision: 100% on test cases
+
+**New Files:**
+- `src/analysis/ast_detector.{hpp,cpp}` - AST-based detector
+- `tests/unit/test_cli.cpp` - CLI tests (7 cases)
+- `tests/unit/test_intake.cpp` - Intake tests (6 cases)
+- `RULES-ROADMAP.md` - Phase 1+ rule expansion plan
+
+**Key Technical Achievements:**
+1. SYSTEM includes for LLVM to suppress third-party warnings
+2. AST matcher patterns validated with clang-query
+3. Self-conforming codebase (uses Safe C++ practices)
+4. SARIF 2.1.0 output with precise AST locations
+
+### Updated Technology Stack
+
+- C++20, Boost 1.82+ (program_options, filesystem, json)
+- **LLVM/Clang 21.1.3** (LibTooling, ASTMatchers) ← NEW
+- CMake 3.20+ with LLVM integration
+- **Boost.Test** unit testing framework ← NEW
+- SARIF 2.1.0 output format
+- macOS/Linux/Windows compatible
+
+### Next Steps
+
+See [RULES-ROADMAP.md](RULES-ROADMAP.md) for detailed rule expansion plan.
+
+**Tier 1 priorities (next sprint):**
+1. SP-OWN-002: Naked delete expression
+2. SP-BOUNDS-001: C-style arrays
+3. SP-TYPE-001: C-style casts
+4. SP-LIFE-003: Return reference to local
+

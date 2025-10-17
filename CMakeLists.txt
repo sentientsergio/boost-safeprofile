@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.20)
 project(boost-safeprofile
     VERSION 0.0.1
     DESCRIPTION "C++ Safety Profile conformance analysis tool"
-    LANGUAGES CXX
+    LANGUAGES C CXX
 )
 
 # Project-wide settings
@@ -37,6 +37,7 @@ add_executable(boost-safeprofile
     src/intake/repository.cpp
     src/profile/loader.cpp
     src/analysis/detector.cpp
+    src/analysis/ast_detector.cpp
     src/emit/sarif.cpp
 )
 
@@ -44,6 +45,14 @@ target_include_directories(boost-safeprofile PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# Add LLVM includes as SYSTEM to suppress warnings from LLVM headers
+target_include_directories(boost-safeprofile SYSTEM PRIVATE
+    ${LLVM_INCLUDE_DIRS}
+)
+
+# Add LLVM definitions
+target_compile_definitions(boost-safeprofile PRIVATE ${LLVM_DEFINITIONS_LIST})
 
 # Apply compiler warnings
 set_project_warnings(boost-safeprofile)
@@ -58,6 +67,19 @@ target_link_libraries(boost-safeprofile PRIVATE
     Boost::program_options
     Boost::filesystem
     Boost::json
+    clangTooling
+    clangFrontend
+    clangDriver
+    clangSerialization
+    clangCodeGen
+    clangParse
+    clangSema
+    clangAnalysis
+    clangEdit
+    clangAST
+    clangASTMatchers
+    clangLex
+    clangBasic
 )
 
 # Installation

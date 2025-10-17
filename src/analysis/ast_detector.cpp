@@ -1,0 +1,174 @@
+// Boost.SafeProfile - C++ Safety Profile conformance analysis tool
+// Copyright (c) 2025 The Boost Authors
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying file LICENSE or copy at https://www.boost.org/LICENSE_1_0.txt)
+
+#include "ast_detector.hpp"
+#include <clang/ASTMatchers/ASTMatchers.h>
+#include <clang/ASTMatchers/ASTMatchFinder.h>
+#include <clang/Tooling/Tooling.h>
+#include <clang/Frontend/FrontendActions.h>
+#include <clang/Tooling/CommonOptionsParser.h>
+#include <clang/Lex/Lexer.h>
+#include <fstream>
+#include <sstream>
+
+namespace boost {
+namespace safeprofile {
+namespace analysis {
+
+using namespace clang;
+using namespace clang::ast_matchers;
+
+// Callback for handling matched AST nodes
+class NewExprCallback : public MatchFinder::MatchCallback {
+public:
+    NewExprCallback(
+        std::vector<ast_finding>& findings,
+        const fs::path& source_file,
+        const profile::rule& rule
+    ) : findings_(findings), source_file_(source_file), rule_(rule) {}
+
+    void run(const MatchFinder::MatchResult& result) override {
+        const auto* new_expr = result.Nodes.getNodeAs<CXXNewExpr>("newExpr");
+        if (!new_expr) return;
+
+        // Skip placement new (it has placement arguments)
+        if (new_expr->getNumPlacementArgs() > 0) {
+            return;
+        }
+
+        // Get source location
+        const SourceManager& sm = *result.SourceManager;
+        SourceLocation loc = new_expr->getBeginLoc();
+
+        // Skip if not in main file (avoid stdlib/headers)
+        if (!sm.isInMainFile(loc)) {
+            return;
+        }
+
+        unsigned int line = sm.getExpansionLineNumber(loc);
+        unsigned int column = sm.getExpansionColumnNumber(loc);
+
+        // Extract code snippet
+        std::string snippet = extractSnippet(sm, new_expr);
+
+        // Determine if it's array or scalar new
+        std::string message = rule_.description;
+        if (new_expr->isArray()) {
+            message += " (array form)";
+        }
+
+        findings_.push_back(ast_finding{
+            source_file_,
+            line,
+            column,
+            message,
+            rule_.id,
+            rule_.level,
+            snippet
+        });
+    }
+
+private:
+    std::string extractSnippet(const SourceManager& sm, const CXXNewExpr* expr) {
+        SourceRange range = expr->getSourceRange();
+        CharSourceRange char_range = CharSourceRange::getTokenRange(range);
+
+        StringRef snippet_ref = Lexer::getSourceText(char_range, sm, LangOptions());
+        if (snippet_ref.empty()) {
+            return "<code unavailable>";
+        }
+
+        // Limit snippet length
+        std::string snippet = snippet_ref.str();
+        if (snippet.length() > 80) {
+            snippet = snippet.substr(0, 77) + "...";
+        }
+
+        return snippet;
+    }
+
+    std::vector<ast_finding>& findings_;
+    fs::path source_file_;
+    profile::rule rule_;
+};
+
+std::vector<ast_finding> ast_detector::analyze_file(
+    const fs::path& source_file,
+    const profile::rule& rule
+) const {
+    std::vector<ast_finding> findings;
+
+    // Only handle "naked new" rule for now (SP-OWN-001)
+    if (rule.id != "SP-OWN-001") {
+        return findings;  // TODO: Support more rules in Phase 1+
+    }
+
+    // Create AST matcher for new expressions
+    // Match: cxxNewExpr that is in main file and not placement new
+    auto matcher = cxxNewExpr(
+        isExpansionInMainFile()
+    ).bind("newExpr");
+
+    // Set up match finder
+    MatchFinder finder;
+    NewExprCallback callback(findings, source_file, rule);
+    finder.addMatcher(matcher, &callback);
+
+    // Read source file content
+    std::ifstream ifs(source_file.string());
+    if (!ifs) {
+        return findings;  // File not readable
+    }
+
+    std::stringstream buffer;
+    buffer << ifs.rdbuf();
+    std::string source_code = buffer.str();
+
+    // Run Clang tooling
+    std::vector<std::string> args = {
+        "-std=c++20",
+        "-fsyntax-only",
+        "-Wno-everything"  // Suppress warnings, we only want AST
+    };
+
+    // Create virtual file for analysis
+    auto factory = tooling::newFrontendActionFactory(&finder);
+    if (!tooling::runToolOnCodeWithArgs(
+        factory->create(),
+        source_code,
+        args,
+        source_file.filename().string()
+    )) {
+        // Analysis failed - might be due to syntax errors
+        // Return empty findings rather than crash
+        return {};
+    }
+
+    return findings;
+}
+
+std::vector<ast_finding> ast_detector::analyze_files(
+    const std::vector<fs::path>& source_files,
+    const std::vector<profile::rule>& rules
+) const {
+    std::vector<ast_finding> all_findings;
+
+    for (const auto& file : source_files) {
+        for (const auto& rule : rules) {
+            auto findings = analyze_file(file, rule);
+            all_findings.insert(
+                all_findings.end(),
+                findings.begin(),
+                findings.end()
+            );
+        }
+    }
+
+    return all_findings;
+}
+
+} // namespace analysis
+} // namespace safeprofile
+} // namespace boost
