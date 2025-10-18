@@ -312,6 +312,78 @@ private:
     profile::rule rule_;  // Store by value to avoid dangling reference
 };
 
+// Callback for detecting return of reference/pointer to local variable
+class ReturnLocalRefCallback : public MatchFinder::MatchCallback {
+public:
+    ReturnLocalRefCallback(
+        std::vector<ast_finding>& findings,
+        const fs::path& source_file,
+        const profile::rule& rule
+    ) : findings_(findings), source_file_(source_file), rule_(rule) {}
+
+    void run(const MatchFinder::MatchResult& result) override {
+        const auto* ret_stmt = result.Nodes.getNodeAs<ReturnStmt>("returnStmt");
+        const auto* decl_ref = result.Nodes.getNodeAs<DeclRefExpr>("localVar");
+
+        if (!ret_stmt || !decl_ref) return;
+
+        // Get source location
+        const SourceManager& sm = *result.SourceManager;
+        SourceLocation loc = ret_stmt->getBeginLoc();
+
+        // Skip if not in main file
+        if (!sm.isInMainFile(loc)) {
+            return;
+        }
+
+        unsigned int line = sm.getExpansionLineNumber(loc);
+        unsigned int column = sm.getExpansionColumnNumber(loc);
+
+        // Extract code snippet
+        std::string snippet = extractSnippet(sm, ret_stmt);
+
+        // Get variable name for better diagnostics
+        const auto* var_decl = dyn_cast<VarDecl>(decl_ref->getDecl());
+        std::string var_name = var_decl ? var_decl->getNameAsString() : "<unknown>";
+
+        std::string message = rule_.description +
+                            " Variable '" + var_name + "' will be destroyed.";
+
+        findings_.push_back(ast_finding{
+            source_file_,
+            line,
+            column,
+            message,
+            rule_.id,
+            rule_.level,
+            snippet
+        });
+    }
+
+private:
+    std::string extractSnippet(const SourceManager& sm, const ReturnStmt* stmt) {
+        SourceRange range = stmt->getSourceRange();
+        CharSourceRange char_range = CharSourceRange::getTokenRange(range);
+
+        StringRef snippet_ref = Lexer::getSourceText(char_range, sm, LangOptions());
+        if (snippet_ref.empty()) {
+            return "<code unavailable>";
+        }
+
+        // Limit snippet length
+        std::string snippet = snippet_ref.str();
+        if (snippet.length() > 80) {
+            snippet = snippet.substr(0, 77) + "...";
+        }
+
+        return snippet;
+    }
+
+    std::vector<ast_finding>& findings_;
+    fs::path source_file_;
+    profile::rule rule_;
+};
+
 std::vector<ast_finding> ast_detector::analyze_file(
     const fs::path& source_file,
     const profile::rule& rule
@@ -359,6 +431,38 @@ std::vector<ast_finding> ast_detector::analyze_file(
         ).bind("cStyleCast");
 
         callback = std::make_unique<CStyleCastCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
+    }
+    else if (rule.id == "SP-LIFE-003") {
+        // Return reference/pointer to local variable matcher
+        // Matches: return &local_var or return local_ref
+        // Excludes parameters (they're safe to return)
+        auto matcher = returnStmt(
+            hasReturnValue(
+                anyOf(
+                    // Case 1: return &local_var (address-of local)
+                    unaryOperator(
+                        hasOperatorName("&"),
+                        hasUnaryOperand(declRefExpr(
+                            to(varDecl(
+                                hasAutomaticStorageDuration(),
+                                unless(parmVarDecl())  // Exclude parameters
+                            ))
+                        ).bind("localVar"))
+                    ),
+                    // Case 2: return local_ref (reference already)
+                    declRefExpr(
+                        to(varDecl(
+                            hasAutomaticStorageDuration(),
+                            unless(parmVarDecl())  // Exclude parameters
+                        ))
+                    ).bind("localVar")
+                )
+            ),
+            isExpansionInMainFile()
+        ).bind("returnStmt");
+
+        callback = std::make_unique<ReturnLocalRefCallback>(findings, source_file, rule);
         finder.addMatcher(matcher, callback.get());
     }
     else {

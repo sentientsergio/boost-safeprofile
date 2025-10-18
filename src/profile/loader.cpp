@@ -70,6 +70,18 @@ std::vector<rule> loader::get_core_safety_profile() {
 
     rules.push_back(c_cast);
 
+    // SP-LIFE-003: Return reference to local
+    rule return_local_ref;
+    return_local_ref.id = "SP-LIFE-003";
+    return_local_ref.title = "Return reference to local variable";
+    return_local_ref.description =
+        "Returning reference or pointer to local variable creates dangling reference. "
+        "Local variables are destroyed when function returns.";
+    return_local_ref.level = severity::blocker;
+    return_local_ref.pattern = "";  // AST-only
+
+    rules.push_back(return_local_ref);
+
     return rules;
 }
 

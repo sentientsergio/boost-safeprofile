@@ -352,4 +352,111 @@ void bad() {
     BOOST_REQUIRE_EQUAL(findings.size(), 3);
 }
 
+BOOST_AUTO_TEST_CASE(test_return_address_of_local) {
+    temp_file test_cpp("test_return_local_addr.cpp", R"(
+int* dangerous() {
+    int x = 42;
+    return &x;  // SP-LIFE-003 violation
+}
+)");
+
+    profile::rule lifetime_rule;
+    lifetime_rule.id = "SP-LIFE-003";
+    lifetime_rule.title = "Return reference to local";
+    lifetime_rule.description = "Returning reference to local variable";
+    lifetime_rule.level = profile::severity::blocker;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 1);
+    BOOST_TEST(findings[0].rule_id == "SP-LIFE-003");
+    BOOST_TEST(findings[0].line == 4);
+}
+
+BOOST_AUTO_TEST_CASE(test_return_reference_to_local) {
+    temp_file test_cpp("test_return_local_ref.cpp", R"(
+int& dangerous() {
+    int x = 42;
+    return x;  // SP-LIFE-003 violation
+}
+)");
+
+    profile::rule lifetime_rule;
+    lifetime_rule.id = "SP-LIFE-003";
+    lifetime_rule.title = "Return reference to local";
+    lifetime_rule.description = "Returning reference to local variable";
+    lifetime_rule.level = profile::severity::blocker;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 1);
+    BOOST_TEST(findings[0].message.find("'x'") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(test_safe_return_heap) {
+    temp_file test_cpp("test_return_heap.cpp", R"(
+int* safe() {
+    static int x = 42;
+    return &x;  // OK - static storage
+}
+)");
+
+    profile::rule lifetime_rule;
+    lifetime_rule.id = "SP-LIFE-003";
+    lifetime_rule.title = "Return reference to local";
+    lifetime_rule.description = "Returning reference to local variable";
+    lifetime_rule.level = profile::severity::blocker;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+
+    BOOST_TEST(findings.empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_safe_return_parameter) {
+    temp_file test_cpp("test_return_param.cpp", R"(
+int& safe(int& param) {
+    return param;  // OK - parameter, not local
+}
+)");
+
+    profile::rule lifetime_rule;
+    lifetime_rule.id = "SP-LIFE-003";
+    lifetime_rule.title = "Return reference to local";
+    lifetime_rule.description = "Returning reference to local variable";
+    lifetime_rule.level = profile::severity::blocker;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+
+    BOOST_TEST(findings.empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_multiple_return_local) {
+    temp_file test_cpp("test_multiple_return_local.cpp", R"(
+int* bad1() {
+    int x = 1;
+    return &x;  // Violation 1
+}
+
+int& bad2() {
+    int y = 2;
+    return y;   // Violation 2
+}
+)");
+
+    profile::rule lifetime_rule;
+    lifetime_rule.id = "SP-LIFE-003";
+    lifetime_rule.title = "Return reference to local";
+    lifetime_rule.description = "Returning reference to local variable";
+    lifetime_rule.level = profile::severity::blocker;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 2);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
