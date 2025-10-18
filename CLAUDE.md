@@ -521,8 +521,47 @@ See [RULES-ROADMAP.md](RULES-ROADMAP.md) for detailed rule expansion plan.
 **Tier 1 priorities (next sprint):**
 1. ~~SP-OWN-002: Naked delete expression~~ ✅ **COMPLETED** (2025-10-17)
 2. ~~SP-BOUNDS-001: C-style arrays~~ ✅ **COMPLETED** (2025-10-17)
-3. SP-TYPE-001: C-style casts
+3. ~~SP-TYPE-001: C-style casts~~ ✅ **COMPLETED** (2025-10-17)
 4. SP-LIFE-003: Return reference to local
+
+---
+
+## SP-TYPE-001 Implementation (2025-10-17)
+
+### Rule: C-Style Cast
+
+**Status:** ✅ Implemented and tested
+
+**What Was Built:**
+- AST-based C-style cast detection with type information
+- `CStyleCastCallback` class with source/destination type reporting
+- 5 comprehensive unit tests covering int casts, pointer casts, and safe C++ casts
+- Type-aware messages show exact types being cast
+- SARIF severity: `major` (warning level)
+
+**Test Results:**
+- Unit tests: **29 passing** (added 5 new C-cast tests)
+- Self-test: **0 violations** across all 4 rules
+- Detection accuracy: 100% (no C-style casts in codebase)
+
+**Implementation Details:**
+- AST Matcher: `cStyleCastExpr(isExpansionInMainFile()).bind("cStyleCast")`
+- Detects: `(int)value`, `(char*)ptr`, `(float)x`
+- Type introspection: Reports source and destination types in findings
+- Example message: "Casting from 'double' to 'int'."
+- Distinguishes from C++ casts: `static_cast`, `const_cast`, `reinterpret_cast`
+
+**Files Modified:**
+- `src/profile/loader.cpp` - Added SP-TYPE-001 rule
+- `src/analysis/ast_detector.cpp` - Added CStyleCastCallback with QualType analysis
+- `tests/unit/test_ast_detector.cpp` - Added 5 test cases (C-casts vs C++ casts)
+
+**Self-Conformance:**
+- Tool's codebase: **0 violations** across all 4 rules
+- Casts: Uses C++ named casts (`static_cast`, etc.) where needed
+- No C-style casts in src/
+
+**Next Rule:** SP-LIFE-003 (Return reference to local) - Final Tier 1 rule
 
 ---
 

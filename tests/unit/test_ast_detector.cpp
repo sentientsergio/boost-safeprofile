@@ -247,4 +247,109 @@ void bad() {
     BOOST_REQUIRE_EQUAL(findings.size(), 3);
 }
 
+BOOST_AUTO_TEST_CASE(test_detect_c_cast_int) {
+    temp_file test_cpp("test_c_cast_int.cpp", R"(
+void unsafe() {
+    double d = 3.14;
+    int i = (int)d;  // SP-TYPE-001 violation
+}
+)");
+
+    profile::rule cast_rule;
+    cast_rule.id = "SP-TYPE-001";
+    cast_rule.title = "C-style cast";
+    cast_rule.description = "C-style cast bypasses type safety";
+    cast_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 1);
+    BOOST_TEST(findings[0].rule_id == "SP-TYPE-001");
+    BOOST_TEST(findings[0].line == 4);
+}
+
+BOOST_AUTO_TEST_CASE(test_detect_c_cast_pointer) {
+    temp_file test_cpp("test_c_cast_ptr.cpp", R"(
+void unsafe() {
+    const char* str = "hello";
+    char* mutable_str = (char*)str;  // SP-TYPE-001 violation
+}
+)");
+
+    profile::rule cast_rule;
+    cast_rule.id = "SP-TYPE-001";
+    cast_rule.title = "C-style cast";
+    cast_rule.description = "C-style cast bypasses type safety";
+    cast_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 1);
+    BOOST_TEST(findings[0].message.find("const char *") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(test_safe_static_cast) {
+    temp_file test_cpp("test_static_cast.cpp", R"(
+void safe() {
+    double d = 3.14;
+    int i = static_cast<int>(d);
+}
+)");
+
+    profile::rule cast_rule;
+    cast_rule.id = "SP-TYPE-001";
+    cast_rule.title = "C-style cast";
+    cast_rule.description = "C-style cast bypasses type safety";
+    cast_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+
+    BOOST_TEST(findings.empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_safe_const_cast) {
+    temp_file test_cpp("test_const_cast.cpp", R"(
+void safe() {
+    const int* cp = nullptr;
+    int* p = const_cast<int*>(cp);
+}
+)");
+
+    profile::rule cast_rule;
+    cast_rule.id = "SP-TYPE-001";
+    cast_rule.title = "C-style cast";
+    cast_rule.description = "C-style cast bypasses type safety";
+    cast_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+
+    BOOST_TEST(findings.empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_multiple_c_casts) {
+    temp_file test_cpp("test_multiple_casts.cpp", R"(
+void bad() {
+    double d = 3.14;
+    int i = (int)d;           // Violation 1
+    float f = (float)d;       // Violation 2
+    char c = (char)i;         // Violation 3
+}
+)");
+
+    profile::rule cast_rule;
+    cast_rule.id = "SP-TYPE-001";
+    cast_rule.title = "C-style cast";
+    cast_rule.description = "C-style cast bypasses type safety";
+    cast_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 3);
+}
+
 BOOST_AUTO_TEST_SUITE_END()

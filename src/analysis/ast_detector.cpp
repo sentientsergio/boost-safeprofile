@@ -239,6 +239,79 @@ private:
     profile::rule rule_;
 };
 
+// Callback for handling C-style casts
+class CStyleCastCallback : public MatchFinder::MatchCallback {
+public:
+    CStyleCastCallback(
+        std::vector<ast_finding>& findings,
+        const fs::path& source_file,
+        const profile::rule& rule
+    ) : findings_(findings), source_file_(source_file), rule_(rule) {}
+
+    void run(const MatchFinder::MatchResult& result) override {
+        const auto* cast_expr = result.Nodes.getNodeAs<CStyleCastExpr>("cStyleCast");
+        if (!cast_expr) return;
+
+        // Get source location
+        const SourceManager& sm = *result.SourceManager;
+        SourceLocation loc = cast_expr->getBeginLoc();
+
+        // Skip if not in main file (avoid stdlib/headers)
+        if (!sm.isInMainFile(loc)) {
+            return;
+        }
+
+        unsigned int line = sm.getExpansionLineNumber(loc);
+        unsigned int column = sm.getExpansionColumnNumber(loc);
+
+        // Extract code snippet
+        std::string snippet = extractSnippet(sm, cast_expr);
+
+        // Build message with type information
+        std::string message = rule_.description;
+
+        // Get cast type names for better diagnostics
+        QualType source_type = cast_expr->getSubExpr()->getType();
+        QualType dest_type = cast_expr->getType();
+
+        message += " Casting from '" + source_type.getAsString() +
+                   "' to '" + dest_type.getAsString() + "'.";
+
+        findings_.push_back(ast_finding{
+            source_file_,
+            line,
+            column,
+            message,
+            rule_.id,
+            rule_.level,
+            snippet
+        });
+    }
+
+private:
+    std::string extractSnippet(const SourceManager& sm, const CStyleCastExpr* expr) {
+        SourceRange range = expr->getSourceRange();
+        CharSourceRange char_range = CharSourceRange::getTokenRange(range);
+
+        StringRef snippet_ref = Lexer::getSourceText(char_range, sm, LangOptions());
+        if (snippet_ref.empty()) {
+            return "<code unavailable>";
+        }
+
+        // Limit snippet length
+        std::string snippet = snippet_ref.str();
+        if (snippet.length() > 80) {
+            snippet = snippet.substr(0, 77) + "...";
+        }
+
+        return snippet;
+    }
+
+    std::vector<ast_finding>& findings_;
+    fs::path source_file_;
+    profile::rule rule_;
+};
+
 std::vector<ast_finding> ast_detector::analyze_file(
     const fs::path& source_file,
     const profile::rule& rule
@@ -274,6 +347,15 @@ std::vector<ast_finding> ast_detector::analyze_file(
         ).bind("arrayDecl");
 
         CStyleArrayCallback callback(findings, source_file, rule);
+        finder.addMatcher(matcher, &callback);
+    }
+    else if (rule.id == "SP-TYPE-001") {
+        // C-style cast matcher
+        auto matcher = cStyleCastExpr(
+            isExpansionInMainFile()
+        ).bind("cStyleCast");
+
+        CStyleCastCallback callback(findings, source_file, rule);
         finder.addMatcher(matcher, &callback);
     }
     else {

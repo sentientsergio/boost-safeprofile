@@ -58,6 +58,18 @@ std::vector<rule> loader::get_core_safety_profile() {
 
     rules.push_back(c_array);
 
+    // SP-TYPE-001: C-style casts
+    rule c_cast;
+    c_cast.id = "SP-TYPE-001";
+    c_cast.title = "C-style cast";
+    c_cast.description =
+        "C-style cast bypasses type safety checks. "
+        "Prefer static_cast, const_cast, or reinterpret_cast for explicit intent.";
+    c_cast.level = severity::major;
+    c_cast.pattern = "";  // AST-only
+
+    rules.push_back(c_cast);
+
     return rules;
 }
 
