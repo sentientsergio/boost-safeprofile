@@ -22,7 +22,7 @@ std::vector<rule> loader::load_profile(const std::string& profile_name) {
 std::vector<rule> loader::get_core_safety_profile() {
     std::vector<rule> rules;
 
-    // Phase 0: Single hardcoded rule for naked new detection
+    // SP-OWN-001: Naked new expression
     rule naked_new;
     naked_new.id = "SP-OWN-001";
     naked_new.title = "Naked new expression";
@@ -30,9 +30,21 @@ std::vector<rule> loader::get_core_safety_profile() {
         "Direct use of 'new' expression without RAII wrapper. "
         "Prefer std::make_unique, std::make_shared, or container allocation.";
     naked_new.level = severity::blocker;
-    naked_new.pattern = " new ";  // Simple keyword search for Phase 0
+    naked_new.pattern = " new ";  // Legacy pattern (AST detector doesn't use this)
 
     rules.push_back(naked_new);
+
+    // SP-OWN-002: Naked delete expression
+    rule naked_delete;
+    naked_delete.id = "SP-OWN-002";
+    naked_delete.title = "Naked delete expression";
+    naked_delete.description =
+        "Direct use of 'delete' expression indicates manual memory management. "
+        "Prefer RAII with smart pointers or containers for automatic cleanup.";
+    naked_delete.level = severity::blocker;
+    naked_delete.pattern = " delete ";  // Legacy pattern (AST detector doesn't use this)
+
+    rules.push_back(naked_delete);
 
     return rules;
 }

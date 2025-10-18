@@ -94,27 +94,106 @@ private:
     profile::rule rule_;
 };
 
+// Callback for handling delete expressions
+class DeleteExprCallback : public MatchFinder::MatchCallback {
+public:
+    DeleteExprCallback(
+        std::vector<ast_finding>& findings,
+        const fs::path& source_file,
+        const profile::rule& rule
+    ) : findings_(findings), source_file_(source_file), rule_(rule) {}
+
+    void run(const MatchFinder::MatchResult& result) override {
+        const auto* delete_expr = result.Nodes.getNodeAs<CXXDeleteExpr>("deleteExpr");
+        if (!delete_expr) return;
+
+        // Get source location
+        const SourceManager& sm = *result.SourceManager;
+        SourceLocation loc = delete_expr->getBeginLoc();
+
+        // Skip if not in main file (avoid stdlib/headers)
+        if (!sm.isInMainFile(loc)) {
+            return;
+        }
+
+        unsigned int line = sm.getExpansionLineNumber(loc);
+        unsigned int column = sm.getExpansionColumnNumber(loc);
+
+        // Extract code snippet
+        std::string snippet = extractSnippet(sm, delete_expr);
+
+        // Determine if it's array or scalar delete
+        std::string message = rule_.description;
+        if (delete_expr->isArrayForm()) {
+            message += " (array form)";
+        }
+
+        findings_.push_back(ast_finding{
+            source_file_,
+            line,
+            column,
+            message,
+            rule_.id,
+            rule_.level,
+            snippet
+        });
+    }
+
+private:
+    std::string extractSnippet(const SourceManager& sm, const CXXDeleteExpr* expr) {
+        SourceRange range = expr->getSourceRange();
+        CharSourceRange char_range = CharSourceRange::getTokenRange(range);
+
+        StringRef snippet_ref = Lexer::getSourceText(char_range, sm, LangOptions());
+        if (snippet_ref.empty()) {
+            return "<code unavailable>";
+        }
+
+        // Limit snippet length
+        std::string snippet = snippet_ref.str();
+        if (snippet.length() > 80) {
+            snippet = snippet.substr(0, 77) + "...";
+        }
+
+        return snippet;
+    }
+
+    std::vector<ast_finding>& findings_;
+    fs::path source_file_;
+    profile::rule rule_;
+};
+
 std::vector<ast_finding> ast_detector::analyze_file(
     const fs::path& source_file,
     const profile::rule& rule
 ) const {
     std::vector<ast_finding> findings;
 
-    // Only handle "naked new" rule for now (SP-OWN-001)
-    if (rule.id != "SP-OWN-001") {
-        return findings;  // TODO: Support more rules in Phase 1+
-    }
-
-    // Create AST matcher for new expressions
-    // Match: cxxNewExpr that is in main file and not placement new
-    auto matcher = cxxNewExpr(
-        isExpansionInMainFile()
-    ).bind("newExpr");
-
-    // Set up match finder
+    // Set up match finder based on rule ID
     MatchFinder finder;
-    NewExprCallback callback(findings, source_file, rule);
-    finder.addMatcher(matcher, &callback);
+
+    if (rule.id == "SP-OWN-001") {
+        // Naked new expression matcher
+        auto matcher = cxxNewExpr(
+            isExpansionInMainFile()
+        ).bind("newExpr");
+
+        NewExprCallback callback(findings, source_file, rule);
+        finder.addMatcher(matcher, &callback);
+    }
+    else if (rule.id == "SP-OWN-002") {
+        // Naked delete expression matcher
+        auto matcher = cxxDeleteExpr(
+            isExpansionInMainFile()
+        ).bind("deleteExpr");
+
+        DeleteExprCallback callback(findings, source_file, rule);
+        finder.addMatcher(matcher, &callback);
+    }
+    else {
+        // Unsupported rule
+        return findings;
+    }
 
     // Read source file content
     std::ifstream ifs(source_file.string());

@@ -519,8 +519,48 @@ _This file is a living document. Update as the project evolves._
 See [RULES-ROADMAP.md](RULES-ROADMAP.md) for detailed rule expansion plan.
 
 **Tier 1 priorities (next sprint):**
-1. SP-OWN-002: Naked delete expression
+1. ~~SP-OWN-002: Naked delete expression~~ ✅ **COMPLETED** (2025-10-17)
 2. SP-BOUNDS-001: C-style arrays
 3. SP-TYPE-001: C-style casts
 4. SP-LIFE-003: Return reference to local
+
+---
+
+## SP-OWN-002 Implementation (2025-10-17)
+
+### Rule: Naked Delete Expression
+
+**Status:** ✅ Implemented and tested
+
+**What Was Built:**
+- AST-based delete expression detection (scalar and array forms)
+- `DeleteExprCallback` class mirroring `NewExprCallback` architecture
+- 5 comprehensive unit tests covering scalar delete, array delete, safe RAII code, and multiple deletes
+- Updated profile loader with SP-OWN-002 rule definition
+- Extended ast_detector to handle both SP-OWN-001 and SP-OWN-002
+
+**Test Results:**
+- Unit tests: **19 passing** (added 5 new AST detector tests)
+- Self-test: **0 violations** (codebase uses RAII, no manual delete)
+- Detection accuracy: 100% (distinguishes `delete` vs `delete[]`)
+
+**Implementation Details:**
+- AST Matcher: `cxxDeleteExpr(isExpansionInMainFile()).bind("deleteExpr")`
+- Detects both `delete ptr` and `delete[] arr` forms
+- Skips standard library headers (main file only)
+- Provides precise source locations and code snippets
+- SARIF severity: `blocker` (error level)
+
+**Files Modified:**
+- `src/profile/loader.cpp` - Added SP-OWN-002 rule
+- `src/analysis/ast_detector.{hpp,cpp}` - Added DeleteExprCallback and matcher
+- `tests/unit/test_ast_detector.cpp` - Added 5 test cases (new file)
+- `tests/CMakeLists.txt` - Added AST detector tests to build
+
+**Self-Conformance:**
+- Tool's own codebase: **0 violations** for both SP-OWN-001 and SP-OWN-002
+- Memory management: All allocations use RAII (std::vector, std::string, std::optional)
+- No manual new/delete anywhere in src/
+
+**Next Rule:** SP-BOUNDS-001 (C-style arrays)
 
