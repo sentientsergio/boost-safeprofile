@@ -91,7 +91,7 @@ private:
 
     std::vector<ast_finding>& findings_;
     fs::path source_file_;
-    profile::rule rule_;
+    profile::rule rule_;  // Store by value to avoid dangling reference
 };
 
 // Callback for handling delete expressions
@@ -160,7 +160,7 @@ private:
 
     std::vector<ast_finding>& findings_;
     fs::path source_file_;
-    profile::rule rule_;
+    profile::rule rule_;  // Store by value to avoid dangling reference
 };
 
 // Callback for handling C-style array declarations
@@ -236,7 +236,7 @@ private:
 
     std::vector<ast_finding>& findings_;
     fs::path source_file_;
-    profile::rule rule_;
+    profile::rule rule_;  // Store by value to avoid dangling reference
 };
 
 // Callback for handling C-style casts
@@ -309,7 +309,7 @@ private:
 
     std::vector<ast_finding>& findings_;
     fs::path source_file_;
-    profile::rule rule_;
+    profile::rule rule_;  // Store by value to avoid dangling reference
 };
 
 std::vector<ast_finding> ast_detector::analyze_file(
@@ -321,14 +321,17 @@ std::vector<ast_finding> ast_detector::analyze_file(
     // Set up match finder based on rule ID
     MatchFinder finder;
 
+    // Allocate callback on stack but ensure it lives through the analysis
+    std::unique_ptr<MatchFinder::MatchCallback> callback;
+
     if (rule.id == "SP-OWN-001") {
         // Naked new expression matcher
         auto matcher = cxxNewExpr(
             isExpansionInMainFile()
         ).bind("newExpr");
 
-        NewExprCallback callback(findings, source_file, rule);
-        finder.addMatcher(matcher, &callback);
+        callback = std::make_unique<NewExprCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
     }
     else if (rule.id == "SP-OWN-002") {
         // Naked delete expression matcher
@@ -336,8 +339,8 @@ std::vector<ast_finding> ast_detector::analyze_file(
             isExpansionInMainFile()
         ).bind("deleteExpr");
 
-        DeleteExprCallback callback(findings, source_file, rule);
-        finder.addMatcher(matcher, &callback);
+        callback = std::make_unique<DeleteExprCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
     }
     else if (rule.id == "SP-BOUNDS-001") {
         // C-style array declaration matcher
@@ -346,8 +349,8 @@ std::vector<ast_finding> ast_detector::analyze_file(
             isExpansionInMainFile()
         ).bind("arrayDecl");
 
-        CStyleArrayCallback callback(findings, source_file, rule);
-        finder.addMatcher(matcher, &callback);
+        callback = std::make_unique<CStyleArrayCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
     }
     else if (rule.id == "SP-TYPE-001") {
         // C-style cast matcher
@@ -355,8 +358,8 @@ std::vector<ast_finding> ast_detector::analyze_file(
             isExpansionInMainFile()
         ).bind("cStyleCast");
 
-        CStyleCastCallback callback(findings, source_file, rule);
-        finder.addMatcher(matcher, &callback);
+        callback = std::make_unique<CStyleCastCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
     }
     else {
         // Unsupported rule
