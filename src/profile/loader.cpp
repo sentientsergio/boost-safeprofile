@@ -46,6 +46,18 @@ std::vector<rule> loader::get_core_safety_profile() {
 
     rules.push_back(naked_delete);
 
+    // SP-BOUNDS-001: C-style arrays
+    rule c_array;
+    c_array.id = "SP-BOUNDS-001";
+    c_array.title = "C-style array declaration";
+    c_array.description =
+        "C-style array declaration lacks bounds checking. "
+        "Prefer std::array for fixed-size or std::vector for dynamic arrays.";
+    c_array.level = severity::major;
+    c_array.pattern = "";  // AST-only
+
+    rules.push_back(c_array);
+
     return rules;
 }
 

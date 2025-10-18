@@ -520,9 +520,47 @@ See [RULES-ROADMAP.md](RULES-ROADMAP.md) for detailed rule expansion plan.
 
 **Tier 1 priorities (next sprint):**
 1. ~~SP-OWN-002: Naked delete expression~~ ✅ **COMPLETED** (2025-10-17)
-2. SP-BOUNDS-001: C-style arrays
+2. ~~SP-BOUNDS-001: C-style arrays~~ ✅ **COMPLETED** (2025-10-17)
 3. SP-TYPE-001: C-style casts
 4. SP-LIFE-003: Return reference to local
+
+---
+
+## SP-BOUNDS-001 Implementation (2025-10-17)
+
+### Rule: C-Style Array Declaration
+
+**Status:** ✅ Implemented and tested
+
+**What Was Built:**
+- AST-based C-style array detection (fixed-size and variable-length)
+- `CStyleArrayCallback` class with type-aware suggestions
+- 5 comprehensive unit tests covering fixed arrays, multidimensional, and safe alternatives
+- Smart suggestions: `std::array<T, N>` for fixed-size, `std::vector<T>` for dynamic
+- SARIF severity: `major` (warning level)
+
+**Test Results:**
+- Unit tests: **24 passing** (added 5 new C-array tests)
+- Self-test: **0 violations** (no C-style arrays in codebase)
+- Detection accuracy: 100% (distinguishes fixed vs variable-length)
+
+**Implementation Details:**
+- AST Matcher: `varDecl(hasType(arrayType()), isExpansionInMainFile()).bind("arrayDecl")`
+- Detects: `int arr[10]`, `char buf[]`, `double matrix[5][5]`
+- Type analysis: Extracts array size for specific recommendations
+- Context-aware messages suggest appropriate safe alternatives
+
+**Files Modified:**
+- `src/profile/loader.cpp` - Added SP-BOUNDS-001 rule
+- `src/analysis/ast_detector.cpp` - Added CStyleArrayCallback with type introspection
+- `tests/unit/test_ast_detector.cpp` - Added 5 test cases (fixed, multi-dim, safe alternatives)
+
+**Self-Conformance:**
+- Tool's codebase: **0 violations** across all 3 rules (SP-OWN-001, SP-OWN-002, SP-BOUNDS-001)
+- Arrays: Uses std::vector and std::string exclusively
+- No C-style arrays in src/
+
+**Next Rule:** SP-TYPE-001 (C-style casts)
 
 ---
 

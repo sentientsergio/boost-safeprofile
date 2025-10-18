@@ -139,4 +139,112 @@ void leak() {
     BOOST_TEST(findings[0].line == 3);
 }
 
+BOOST_AUTO_TEST_CASE(test_detect_c_array_fixed_size) {
+    temp_file test_cpp("test_c_array.cpp", R"(
+void unsafe() {
+    int arr[10];  // SP-BOUNDS-001 violation
+    arr[0] = 42;
+}
+)");
+
+    profile::rule array_rule;
+    array_rule.id = "SP-BOUNDS-001";
+    array_rule.title = "C-style array declaration";
+    array_rule.description = "C-style array lacks bounds checking";
+    array_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 1);
+    BOOST_TEST(findings[0].rule_id == "SP-BOUNDS-001");
+    BOOST_TEST(findings[0].line == 3);
+    BOOST_TEST(findings[0].message.find("std::array<T, 10>") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(test_detect_c_array_multidimensional) {
+    temp_file test_cpp("test_c_array_2d.cpp", R"(
+void matrix() {
+    int grid[5][5];  // SP-BOUNDS-001 violation
+}
+)");
+
+    profile::rule array_rule;
+    array_rule.id = "SP-BOUNDS-001";
+    array_rule.title = "C-style array declaration";
+    array_rule.description = "C-style array lacks bounds checking";
+    array_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 1);
+    BOOST_TEST(findings[0].rule_id == "SP-BOUNDS-001");
+}
+
+BOOST_AUTO_TEST_CASE(test_safe_std_array) {
+    temp_file test_cpp("test_std_array.cpp", R"(
+#include <array>
+
+void safe() {
+    std::array<int, 10> arr;
+    arr[0] = 42;
+}
+)");
+
+    profile::rule array_rule;
+    array_rule.id = "SP-BOUNDS-001";
+    array_rule.title = "C-style array declaration";
+    array_rule.description = "C-style array lacks bounds checking";
+    array_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+
+    BOOST_TEST(findings.empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_safe_std_vector) {
+    temp_file test_cpp("test_std_vector.cpp", R"(
+#include <vector>
+
+void safe() {
+    std::vector<int> vec(10);
+    vec[0] = 42;
+}
+)");
+
+    profile::rule array_rule;
+    array_rule.id = "SP-BOUNDS-001";
+    array_rule.title = "C-style array declaration";
+    array_rule.description = "C-style array lacks bounds checking";
+    array_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+
+    BOOST_TEST(findings.empty());
+}
+
+BOOST_AUTO_TEST_CASE(test_multiple_c_arrays) {
+    temp_file test_cpp("test_multiple_arrays.cpp", R"(
+void bad() {
+    int arr1[5];   // Violation 1
+    char arr2[10]; // Violation 2
+    double arr3[3]; // Violation 3
+}
+)");
+
+    profile::rule array_rule;
+    array_rule.id = "SP-BOUNDS-001";
+    array_rule.title = "C-style array declaration";
+    array_rule.description = "C-style array lacks bounds checking";
+    array_rule.level = profile::severity::major;
+
+    analysis::ast_detector detector;
+    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+
+    BOOST_REQUIRE_EQUAL(findings.size(), 3);
+}
+
 BOOST_AUTO_TEST_SUITE_END()
