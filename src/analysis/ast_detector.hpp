@@ -7,9 +7,11 @@
 #define BOOST_SAFEPROFILE_ANALYSIS_AST_DETECTOR_HPP
 
 #include "profile/rule.hpp"
+#include "intake/compile_commands.hpp"
 #include <boost/filesystem.hpp>
 #include <vector>
 #include <string>
+#include <memory>
 
 namespace boost {
 namespace safeprofile {
@@ -28,21 +30,57 @@ struct ast_finding {
     std::string snippet;  // Code snippet showing the violation
 };
 
+/// Analysis result for a single file
+struct file_analysis_result {
+    fs::path file;
+    bool success;  // true if analysis succeeded, false if compilation failed
+    std::string error_message;  // populated if success == false
+    std::vector<ast_finding> findings;  // populated if success == true
+};
+
 /// AST-based detector using Clang LibTooling
 /// This replaces the keyword-based detector with proper semantic analysis
 class ast_detector {
 public:
+    /// Set compilation database for resolving include paths and flags
+    /// Should be called before analyze_files() for best results
+    void set_compilation_database(std::shared_ptr<intake::compile_commands_reader> db) {
+        compile_db_ = db;
+    }
+
     /// Analyze a single source file using AST
-    /// Returns findings for the given rule
-    std::vector<ast_finding> analyze_file(
+    /// Returns result with success status and findings (or error message)
+    file_analysis_result analyze_file(
         const fs::path& source_file,
         const profile::rule& rule
     ) const;
 
+    /// Analyze a single source file with explicit compiler flags
+    /// Used internally when compilation database is available
+    file_analysis_result analyze_file_with_flags(
+        const fs::path& source_file,
+        const profile::rule& rule,
+        const std::vector<std::string>& compiler_args
+    ) const;
+
     /// Analyze multiple source files
+    /// Returns findings from all successfully analyzed files
+    /// Files that fail to compile are tracked separately
     std::vector<ast_finding> analyze_files(
         const std::vector<fs::path>& source_files,
-        const std::vector<profile::rule>& rules
+        const std::vector<profile::rule>& rules,
+        std::vector<file_analysis_result>& failed_files  // OUT: files that failed analysis
+    ) const;
+
+private:
+    std::shared_ptr<intake::compile_commands_reader> compile_db_;
+
+    /// Build default compiler arguments if no compilation database available
+    std::vector<std::string> get_default_compiler_args() const;
+
+    /// Build compiler arguments from compilation flags
+    std::vector<std::string> build_compiler_args(
+        const intake::compilation_flags& flags
     ) const;
 };
 

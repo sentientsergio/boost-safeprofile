@@ -384,10 +384,14 @@ private:
     profile::rule rule_;
 };
 
-std::vector<ast_finding> ast_detector::analyze_file(
+file_analysis_result ast_detector::analyze_file(
     const fs::path& source_file,
     const profile::rule& rule
 ) const {
+    file_analysis_result result;
+    result.file = source_file;
+    result.success = false;
+
     std::vector<ast_finding> findings;
 
     // Set up match finder based on rule ID
@@ -467,60 +471,194 @@ std::vector<ast_finding> ast_detector::analyze_file(
     }
     else {
         // Unsupported rule
-        return findings;
+        result.error_message = "Unsupported rule: " + rule.id;
+        return result;
+    }
+
+    // Get compiler arguments (from compilation database or defaults)
+    std::vector<std::string> args;
+
+    if (compile_db_ && compile_db_->is_loaded()) {
+        auto flags_opt = compile_db_->get_flags_for_file(source_file);
+        if (flags_opt) {
+            args = build_compiler_args(*flags_opt);
+        } else {
+            // File not in compilation database, use defaults
+            args = get_default_compiler_args();
+        }
+    } else {
+        args = get_default_compiler_args();
+    }
+
+    return analyze_file_with_flags(source_file, rule, args);
+}
+
+file_analysis_result ast_detector::analyze_file_with_flags(
+    const fs::path& source_file,
+    const profile::rule& rule,
+    const std::vector<std::string>& compiler_args
+) const {
+    file_analysis_result result;
+    result.file = source_file;
+    result.success = false;
+
+    std::vector<ast_finding> findings;
+
+    // Set up match finder (same logic as before)
+    MatchFinder finder;
+    std::unique_ptr<MatchFinder::MatchCallback> callback;
+
+    // [Matcher setup code - same as in analyze_file above]
+    if (rule.id == "SP-OWN-001") {
+        auto matcher = cxxNewExpr(isExpansionInMainFile()).bind("newExpr");
+        callback = std::make_unique<NewExprCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
+    }
+    else if (rule.id == "SP-OWN-002") {
+        auto matcher = cxxDeleteExpr(isExpansionInMainFile()).bind("deleteExpr");
+        callback = std::make_unique<DeleteExprCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
+    }
+    else if (rule.id == "SP-BOUNDS-001") {
+        auto matcher = varDecl(hasType(arrayType()), isExpansionInMainFile()).bind("arrayDecl");
+        callback = std::make_unique<CStyleArrayCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
+    }
+    else if (rule.id == "SP-TYPE-001") {
+        auto matcher = cStyleCastExpr(isExpansionInMainFile()).bind("cStyleCast");
+        callback = std::make_unique<CStyleCastCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
+    }
+    else if (rule.id == "SP-LIFE-003") {
+        auto matcher = returnStmt(
+            hasReturnValue(
+                anyOf(
+                    unaryOperator(
+                        hasOperatorName("&"),
+                        hasUnaryOperand(declRefExpr(
+                            to(varDecl(
+                                hasAutomaticStorageDuration(),
+                                unless(parmVarDecl())
+                            ))
+                        ).bind("localVar"))
+                    ),
+                    declRefExpr(
+                        to(varDecl(
+                            hasAutomaticStorageDuration(),
+                            unless(parmVarDecl())
+                        ))
+                    ).bind("localVar")
+                )
+            ),
+            isExpansionInMainFile()
+        ).bind("returnStmt");
+        callback = std::make_unique<ReturnLocalRefCallback>(findings, source_file, rule);
+        finder.addMatcher(matcher, callback.get());
+    }
+    else {
+        result.error_message = "Unsupported rule: " + rule.id;
+        return result;
     }
 
     // Read source file content
     std::ifstream ifs(source_file.string());
     if (!ifs) {
-        return findings;  // File not readable
+        result.error_message = "Failed to read file";
+        return result;
     }
 
     std::stringstream buffer;
     buffer << ifs.rdbuf();
     std::string source_code = buffer.str();
 
-    // Run Clang tooling
-    std::vector<std::string> args = {
-        "-std=c++20",
-        "-fsyntax-only",
-        "-Wno-everything"  // Suppress warnings, we only want AST
-    };
-
-    // Create virtual file for analysis
+    // Run Clang tooling with provided compiler args
     auto factory = tooling::newFrontendActionFactory(&finder);
     if (!tooling::runToolOnCodeWithArgs(
         factory->create(),
         source_code,
-        args,
+        compiler_args,
         source_file.filename().string()
     )) {
-        // Analysis failed - might be due to syntax errors
-        // Return empty findings rather than crash
-        return {};
+        // Analysis failed - compilation error
+        result.error_message = "Compilation failed (syntax error, missing includes, or type error)";
+        return result;
     }
 
-    return findings;
+    // Success!
+    result.success = true;
+    result.findings = std::move(findings);
+    return result;
 }
 
 std::vector<ast_finding> ast_detector::analyze_files(
     const std::vector<fs::path>& source_files,
-    const std::vector<profile::rule>& rules
+    const std::vector<profile::rule>& rules,
+    std::vector<file_analysis_result>& failed_files
 ) const {
     std::vector<ast_finding> all_findings;
+    failed_files.clear();
 
     for (const auto& file : source_files) {
         for (const auto& rule : rules) {
-            auto findings = analyze_file(file, rule);
-            all_findings.insert(
-                all_findings.end(),
-                findings.begin(),
-                findings.end()
-            );
+            auto result = analyze_file(file, rule);
+
+            if (result.success) {
+                // Add findings from successful analysis
+                all_findings.insert(
+                    all_findings.end(),
+                    result.findings.begin(),
+                    result.findings.end()
+                );
+            } else {
+                // Track failed file (only record once per file, not per rule)
+                bool already_recorded = false;
+                for (const auto& failed : failed_files) {
+                    if (failed.file == file) {
+                        already_recorded = true;
+                        break;
+                    }
+                }
+                if (!already_recorded) {
+                    failed_files.push_back(result);
+                }
+            }
         }
     }
 
     return all_findings;
+}
+
+std::vector<std::string> ast_detector::get_default_compiler_args() const {
+    return {
+        "-std=c++20",
+        "-fsyntax-only",
+        "-Wno-everything"  // Suppress warnings, we only want AST
+    };
+}
+
+std::vector<std::string> ast_detector::build_compiler_args(
+    const intake::compilation_flags& flags
+) const {
+    std::vector<std::string> args;
+
+    // C++ standard
+    args.push_back("-std=" + flags.std_version);
+
+    // Include paths
+    for (const auto& include : flags.include_paths) {
+        args.push_back("-I" + include);
+    }
+
+    // Defines
+    for (const auto& define : flags.defines) {
+        args.push_back("-D" + define);
+    }
+
+    // Always add these
+    args.push_back("-fsyntax-only");
+    args.push_back("-Wno-everything");
+
+    return args;
 }
 
 } // namespace analysis

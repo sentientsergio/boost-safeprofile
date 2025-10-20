@@ -5,12 +5,14 @@
 
 #include "cli/arguments.hpp"
 #include "intake/repository.hpp"
+#include "intake/compile_commands.hpp"
 #include "profile/loader.hpp"
 #include "analysis/detector.hpp"
 #include "analysis/ast_detector.hpp"
 #include "emit/sarif.hpp"
 #include <iostream>
 #include <exception>
+#include <memory>
 
 int main(int argc, char* argv[]) {
     try {
@@ -47,9 +49,24 @@ int main(int argc, char* argv[]) {
         }
         std::cout << "\n";
 
+        // Step 2.5: Try to load compile_commands.json (optional)
+        auto compile_db = std::make_shared<boost::safeprofile::intake::compile_commands_reader>();
+        if (compile_db->load_from_directory(args->target_path)) {
+            std::cout << "Loaded compile_commands.json (" << compile_db->entry_count() << " entries)\n";
+            std::cout << "Using compilation database for include paths and flags.\n\n";
+        } else {
+            std::cout << "No compile_commands.json found - using default C++20 flags.\n";
+            std::cout << "(Tip: Generate with 'cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON' for better results)\n\n";
+        }
+
         // Step 3: Run analysis (using AST-based detector)
         std::cout << "Running AST-based analysis...\n";
         boost::safeprofile::analysis::ast_detector ast_det;
+
+        // Set compilation database if loaded
+        if (compile_db->is_loaded()) {
+            ast_det.set_compilation_database(compile_db);
+        }
 
         // Extract file paths from sources
         std::vector<boost::filesystem::path> file_paths;
@@ -57,7 +74,8 @@ int main(int argc, char* argv[]) {
             file_paths.push_back(src.path);
         }
 
-        auto ast_findings = ast_det.analyze_files(file_paths, rules);
+        std::vector<boost::safeprofile::analysis::file_analysis_result> failed_files;
+        auto ast_findings = ast_det.analyze_files(file_paths, rules, failed_files);
 
         // Convert AST findings to regular findings for compatibility
         std::vector<boost::safeprofile::analysis::finding> findings;
@@ -75,6 +93,16 @@ int main(int argc, char* argv[]) {
         std::cout << "Analysis complete. Found " << findings.size() << " violation(s).\n";
         std::cout << "(AST-based detection - no false positives in comments/strings)\n\n";
 
+        // Report compilation failures
+        if (!failed_files.empty()) {
+            std::cerr << "⚠️  WARNING: " << failed_files.size() << " file(s) failed to compile and were not analyzed:\n";
+            for (const auto& failed : failed_files) {
+                std::cerr << "  " << failed.file.string() << ": " << failed.error_message << "\n";
+            }
+            std::cerr << "\nNote: Compilation errors prevent AST analysis. ";
+            std::cerr << "Ensure files compile with C++20 or provide compile_commands.json.\n\n";
+        }
+
         // Display findings
         if (!findings.empty()) {
             std::cout << "Violations:\n";
@@ -85,7 +113,12 @@ int main(int argc, char* argv[]) {
             }
             std::cout << "\n";
         } else {
-            std::cout << "No violations found! ✓\n\n";
+            if (failed_files.empty()) {
+                std::cout << "No violations found! ✓\n\n";
+            } else {
+                std::cout << "No violations found in successfully analyzed files.\n";
+                std::cout << "(However, some files failed to compile - see warnings above)\n\n";
+            }
         }
 
         // Step 4: Generate SARIF output (if requested)
@@ -97,10 +130,17 @@ int main(int argc, char* argv[]) {
             std::cout << "SARIF written to: " << *args->sarif_output << "\n\n";
         }
 
-        return findings.empty() ? 0 : 1;  // Exit code reflects findings
+        // Exit codes:
+        // 0 = no violations, all files analyzed successfully
+        // 1 = violations found (but all files analyzed successfully)
+        // 2 = some files failed to compile (partial analysis)
+        if (!failed_files.empty()) {
+            return 2;  // Partial failure - some files couldn't be analyzed
+        }
+        return findings.empty() ? 0 : 1;  // Success or violations
 
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
-        return 1;
+        return 3;  // Fatal error
     }
 }

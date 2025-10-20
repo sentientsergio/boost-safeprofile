@@ -35,6 +35,7 @@ add_executable(boost-safeprofile
     src/main.cpp
     src/cli/arguments.cpp
     src/intake/repository.cpp
+    src/intake/compile_commands.cpp
     src/profile/loader.cpp
     src/analysis/detector.cpp
     src/analysis/ast_detector.cpp

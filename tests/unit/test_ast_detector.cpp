@@ -45,11 +45,12 @@ void leak() {
     delete_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, delete_rule);
+    auto result = detector.analyze_file(test_cpp.path, delete_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-OWN-002");
-    BOOST_TEST(findings[0].line == 4);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-OWN-002");
+    BOOST_TEST(result.findings[0].line == 4);
 }
 
 BOOST_AUTO_TEST_CASE(test_detect_naked_delete_array) {
@@ -67,11 +68,12 @@ void leak() {
     delete_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, delete_rule);
+    auto result = detector.analyze_file(test_cpp.path, delete_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-OWN-002");
-    BOOST_TEST(findings[0].message.find("array form") != std::string::npos);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-OWN-002");
+    BOOST_TEST(result.findings[0].message.find("array form") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(test_no_delete_safe_code) {
@@ -91,9 +93,10 @@ void safe() {
     delete_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, delete_rule);
+    auto result = detector.analyze_file(test_cpp.path, delete_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_multiple_deletes) {
@@ -113,9 +116,10 @@ void bad() {
     delete_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, delete_rule);
+    auto result = detector.analyze_file(test_cpp.path, delete_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 2);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 2);
 }
 
 BOOST_AUTO_TEST_CASE(test_detect_naked_new) {
@@ -132,11 +136,12 @@ void leak() {
     new_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, new_rule);
+    auto result = detector.analyze_file(test_cpp.path, new_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-OWN-001");
-    BOOST_TEST(findings[0].line == 3);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-OWN-001");
+    BOOST_TEST(result.findings[0].line == 3);
 }
 
 BOOST_AUTO_TEST_CASE(test_detect_c_array_fixed_size) {
@@ -154,12 +159,13 @@ void unsafe() {
     array_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+    auto result = detector.analyze_file(test_cpp.path, array_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-BOUNDS-001");
-    BOOST_TEST(findings[0].line == 3);
-    BOOST_TEST(findings[0].message.find("std::array<T, 10>") != std::string::npos);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-BOUNDS-001");
+    BOOST_TEST(result.findings[0].line == 3);
+    BOOST_TEST(result.findings[0].message.find("std::array<T, 10>") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(test_detect_c_array_multidimensional) {
@@ -176,10 +182,11 @@ void matrix() {
     array_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+    auto result = detector.analyze_file(test_cpp.path, array_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-BOUNDS-001");
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-BOUNDS-001");
 }
 
 BOOST_AUTO_TEST_CASE(test_safe_std_array) {
@@ -199,9 +206,10 @@ void safe() {
     array_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+    auto result = detector.analyze_file(test_cpp.path, array_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_safe_std_vector) {
@@ -221,9 +229,10 @@ void safe() {
     array_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+    auto result = detector.analyze_file(test_cpp.path, array_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_multiple_c_arrays) {
@@ -242,9 +251,10 @@ void bad() {
     array_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, array_rule);
+    auto result = detector.analyze_file(test_cpp.path, array_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 3);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 3);
 }
 
 BOOST_AUTO_TEST_CASE(test_detect_c_cast_int) {
@@ -262,11 +272,12 @@ void unsafe() {
     cast_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+    auto result = detector.analyze_file(test_cpp.path, cast_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-TYPE-001");
-    BOOST_TEST(findings[0].line == 4);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-TYPE-001");
+    BOOST_TEST(result.findings[0].line == 4);
 }
 
 BOOST_AUTO_TEST_CASE(test_detect_c_cast_pointer) {
@@ -284,10 +295,11 @@ void unsafe() {
     cast_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+    auto result = detector.analyze_file(test_cpp.path, cast_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].message.find("const char *") != std::string::npos);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].message.find("const char *") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(test_safe_static_cast) {
@@ -305,9 +317,10 @@ void safe() {
     cast_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+    auto result = detector.analyze_file(test_cpp.path, cast_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_safe_const_cast) {
@@ -325,9 +338,10 @@ void safe() {
     cast_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+    auto result = detector.analyze_file(test_cpp.path, cast_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_multiple_c_casts) {
@@ -347,9 +361,10 @@ void bad() {
     cast_rule.level = profile::severity::major;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, cast_rule);
+    auto result = detector.analyze_file(test_cpp.path, cast_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 3);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 3);
 }
 
 BOOST_AUTO_TEST_CASE(test_return_address_of_local) {
@@ -367,11 +382,12 @@ int* dangerous() {
     lifetime_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+    auto result = detector.analyze_file(test_cpp.path, lifetime_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].rule_id == "SP-LIFE-003");
-    BOOST_TEST(findings[0].line == 4);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].rule_id == "SP-LIFE-003");
+    BOOST_TEST(result.findings[0].line == 4);
 }
 
 BOOST_AUTO_TEST_CASE(test_return_reference_to_local) {
@@ -389,10 +405,11 @@ int& dangerous() {
     lifetime_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+    auto result = detector.analyze_file(test_cpp.path, lifetime_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 1);
-    BOOST_TEST(findings[0].message.find("'x'") != std::string::npos);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 1);
+    BOOST_TEST(result.findings[0].message.find("'x'") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(test_safe_return_heap) {
@@ -410,9 +427,10 @@ int* safe() {
     lifetime_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+    auto result = detector.analyze_file(test_cpp.path, lifetime_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_safe_return_parameter) {
@@ -429,9 +447,10 @@ int& safe(int& param) {
     lifetime_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+    auto result = detector.analyze_file(test_cpp.path, lifetime_rule);
 
-    BOOST_TEST(findings.empty());
+    BOOST_REQUIRE(result.success);
+    BOOST_TEST(result.findings.empty());
 }
 
 BOOST_AUTO_TEST_CASE(test_multiple_return_local) {
@@ -454,9 +473,10 @@ int& bad2() {
     lifetime_rule.level = profile::severity::blocker;
 
     analysis::ast_detector detector;
-    auto findings = detector.analyze_file(test_cpp.path, lifetime_rule);
+    auto result = detector.analyze_file(test_cpp.path, lifetime_rule);
 
-    BOOST_REQUIRE_EQUAL(findings.size(), 2);
+    BOOST_REQUIRE(result.success);
+    BOOST_REQUIRE_EQUAL(result.findings.size(), 2);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

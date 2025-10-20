@@ -11,6 +11,7 @@ add_executable(unit_tests
     # Source files to test
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/cli/arguments.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/intake/repository.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/intake/compile_commands.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/analysis/ast_detector.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/profile/loader.cpp
 )

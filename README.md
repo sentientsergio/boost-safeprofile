@@ -35,41 +35,43 @@ Modern C++ teams face sustained pressure to reduce memory-safety defects. WG21 i
 
 ## Quickstart
 
+**Current Status:** Tier 1 rules implemented (Ownership, Bounds, Type, Lifetime). See [Known Limitations](#known-limitations) below.
+
 Analyze a local project:
 
 ```bash
-boost-safeprofile analyze --profile core-safety ./path/to/project
+build/boost-safeprofile ./path/to/project
 ```
 
-Point at a remote repo (shallow clone):
+Generate SARIF output for CI/IDE integration:
 
 ```bash
-boost-safeprofile analyze --profile core-safety https://github.com/cppalliance/json
+build/boost-safeprofile --sarif output.sarif ./path/to/project
 ```
 
-Generate an **evidence pack** (zip) and a concise HTML summary:
+Use a specific profile:
 
 ```bash
-boost-safeprofile analyze \
-  --profile memory-safety \
-  --evidence ./out/evidence \
-  --report ./out/report.html \
-  ./path/to/project
+build/boost-safeprofile --profile memory-safety ./path/to/project
 ```
 
-Use **offline** mode (default) to ensure no network access during analysis:
+**For projects with system includes:** Generate and provide a `compile_commands.json`:
 
 ```bash
-boost-safeprofile analyze --offline ./path
+# In your project directory
+cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -B build
+cp build/compile_commands.json .
+
+# Then analyze
+boost-safeprofile ./path/to/project
 ```
 
-Optionally enable AI-assisted explanations/suggestions (still deterministic fallbacks if unavailable):
+**Self-test** (verify tool's own code is safe):
 
 ```bash
-boost-safeprofile analyze --online --ai-explain --ai-suggest ./path
+build/boost-safeprofile --sarif self-test.sarif src/
+# Exit code 0 = clean, 1 = violations, 2 = compilation errors
 ```
-
-> **Tip:** For large codebases, provide or generate a `compile_commands.json` for best accuracy.
 
 ---
 
@@ -294,14 +296,71 @@ This tool “eats its own cooking”:
 
 ---
 
-## Roadmap (preview)
+## Known Limitations
 
-- v0: Repo intake → core detectors → SARIF/HTML → evidence pack
-- v1: Memory/lifetime rules, suggestions (minimal diffs), CI baselines
-- v1.x: Optional AI layers (NL explanations, annotation inference), editor integration
-- v2: Expanded profiles, sanitizer/fuzzer correlation, performance & scalability passes
+**Current Version:** Tier 1 rules implemented (v0.4.0-dev)
 
-(Exact milestones will be tracked in the issue tracker.)
+### What Works ✅
+- Self-contained C++ code (no system includes)
+- Detects 5 core safety violations:
+  - SP-OWN-001: Naked new expression
+  - SP-OWN-002: Naked delete expression
+  - SP-BOUNDS-001: C-style array declaration
+  - SP-TYPE-001: C-style cast
+  - SP-LIFE-003: Return reference to local variable
+- AST-based semantic analysis (no false positives in comments/strings)
+- SARIF 2.1.0 output
+- Explicit compilation error reporting
+- compile_commands.json support (infrastructure in place)
+
+### Known Gaps ⚠️
+1. **System Include Resolution:** Files with `#include <memory>` may fail to compile even with compile_commands.json
+   - **Workaround:** Use compilation databases from actual CMake projects
+   - **Status:** Infrastructure complete, refinement needed
+
+2. **Limited Rule Coverage:** Only 5 rules implemented (18+ planned)
+   - See [RULES-ROADMAP.md](RULES-ROADMAP.md) for expansion plan
+
+3. **No Git/Remote Repository Support:** Local directories only (planned for Phase 1.x)
+
+4. **No HTML Reports:** SARIF output only (HTML generator planned)
+
+5. **No AI Assistance:** Deterministic analysis only (AI layers planned for v1.x)
+
+6. **No Evidence Packs:** SARIF only (full evidence bundles planned)
+
+### Not Tested Yet 🔍
+- Template metaprogramming edge cases
+- Heavy macro usage
+- Cross-compilation scenarios
+- Windows platform (macOS/Linux only so far)
+
+**See [RED-TEAM-SPRINT-1.md](RED-TEAM-SPRINT-1.md) for detailed test results.**
+
+---
+
+## Roadmap
+
+### Completed
+- ✅ v0.1.0: AST-based detection, SP-OWN-001 (naked new)
+- ✅ v0.2.0: SP-OWN-002 (naked delete)
+- ✅ v0.3.0: SP-BOUNDS-001 (C-style arrays)
+- ✅ v0.4.0: SP-TYPE-001 (C-style casts), SP-LIFE-003 (dangling refs)
+
+### Next (v0.5.0+)
+- Tier 2 rules expansion (ownership, bounds, type safety)
+- CI/CD integration (GitHub Actions)
+- Real-world project testing
+- HTML report generation
+
+### Future (v1.0+)
+- Complete WG21 Safety Profile coverage
+- Git repository support
+- Evidence pack generation
+- Optional AI assistance layers
+- Editor/IDE integration
+
+(Exact milestones tracked in issue tracker.)
 
 ---
 

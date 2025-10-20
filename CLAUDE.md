@@ -119,14 +119,51 @@ boost-safeprofile/
 
 ### Testing Strategy
 
+**Testing is not optional. Testing precedes claiming features work.**
+
 - **Framework:** Boost.Test (keeps dependencies aligned)
 - **Unit tests:** Written alongside implementation, per-module coverage
 - **Integration tests:** End-to-end CLI invocations on fixture projects
 - **Self-conformance:** Run tool on `src/` directory as soon as first rule works
+- **Red Team Testing (MANDATORY before milestone tags):**
+  - Adversarial test cases designed to break assumptions
+  - Real-world codebase testing (not just synthetic demos)
+  - Boundary conditions and error paths
+  - "Does it actually work?" validation, not just "does it compile?"
 - **CI from Day 1:**
   - Warnings-as-errors (`-Wall -Wextra -Werror`)
   - AddressSanitizer + UBSan in pipeline
   - Multi-platform matrix (Linux/macOS/Windows)
+  - **Integration test suite on real projects**
+
+### Red Team Protocol (Added 2025-10-20)
+
+**Before ANY milestone tag (v0.x.0) or "complete" claim:**
+
+1. **Adversarial Testing Sprint**
+   - Create test cases explicitly designed to fail
+   - Test with real-world projects (not synthetic demos)
+   - Verify error handling (not just happy path)
+   - Document limitations honestly
+
+2. **Question to Ask: "Does this actually work?"**
+   - Not "does the demo pass?"
+   - Not "does the self-test pass?"
+   - But: "Can this analyze a real C++ project?"
+
+3. **Red Team Test Fixtures** (`tests/fixtures/`)
+   - `minimal/` - No includes, self-contained
+   - `stdlib/` - Uses standard library headers
+   - `real-world/` - Snippet from actual Boost library
+   - `edge-cases/` - Boundary conditions, error paths
+   - `compile-errors/` - Invalid code (test error handling)
+
+4. **Exit Criteria for "Complete"**
+   - All unit tests pass ✓
+   - All integration tests pass ✓
+   - **Red team tests pass ✓** ← NEW, MANDATORY
+   - Real-world project analyzed successfully ✓
+   - Known limitations documented ✓
 
 ### Code Quality
 
@@ -209,6 +246,11 @@ boost-safeprofile/
 3. **Skipping self-tests:** Run tool on `src/` continuously to catch self-conformance violations
 4. **Ignoring Windows:** Test on all platforms early; path handling and console I/O differ
 5. **Monolithic commits:** Keep commits focused and logical; easier to review and revert
+6. **🚨 CLAIMING "COMPLETE" WITHOUT RED TEAM TESTING 🚨** ← **ADDED 2025-10-20**
+   - **Never tag a milestone without adversarial testing**
+   - **Never claim a feature works without real-world validation**
+   - **Silent failures are unacceptable** - error paths must be tested
+   - **Synthetic demos passing ≠ production ready**
 
 ---
 
@@ -467,11 +509,17 @@ git log --oneline
 
 - **2025-10-15 (Morning):** Initial creation; captured technology stack, structure, methodology, and Phase 0 roadmap decisions.
 - **2025-10-15 (Evening):** Phase 0 completion; added implementation summary, self-conformance results, and Phase 1 roadmap. Ready for v0.0.1 release.
+- **2025-10-16:** Phase 1 core complete; AST-based detection working, LLVM integrated, testing framework established, rules roadmap created.
+- **2025-10-20:** 🚨 **CRITICAL METHODOLOGY UPDATE** 🚨
+  - Added mandatory Red Team Testing protocol
+  - Retracted "Tier 1 COMPLETE" claims pending adversarial validation
+  - Discovered silent failure on compilation errors (blocker issue)
+  - Elevated testing requirements: synthetic demos ≠ production readiness
+  - **Key lesson:** "Does it work?" must be asked adversarially, not optimistically
 
 ---
 
 _This file is a living document. Update as the project evolves._
-- **2025-10-16:** Phase 1 core complete; AST-based detection working, LLVM integrated, testing framework established, rules roadmap created.
 
 ---
 
@@ -519,12 +567,14 @@ _This file is a living document. Update as the project evolves._
 See [RULES-ROADMAP.md](RULES-ROADMAP.md) for detailed rule expansion plan.
 
 **Tier 1 priorities (next sprint):**
-1. ~~SP-OWN-002: Naked delete expression~~ ✅ **COMPLETED** (2025-10-17)
-2. ~~SP-BOUNDS-001: C-style arrays~~ ✅ **COMPLETED** (2025-10-17)
-3. ~~SP-TYPE-001: C-style casts~~ ✅ **COMPLETED** (2025-10-17)
-4. ~~SP-LIFE-003: Return reference to local~~ ✅ **COMPLETED** (2025-10-17)
+1. ~~SP-OWN-002: Naked delete expression~~ ✅ **IMPLEMENTED** (2025-10-17)
+2. ~~SP-BOUNDS-001: C-style arrays~~ ✅ **IMPLEMENTED** (2025-10-17)
+3. ~~SP-TYPE-001: C-style casts~~ ✅ **IMPLEMENTED** (2025-10-17)
+4. ~~SP-LIFE-003: Return reference to local~~ ✅ **IMPLEMENTED** (2025-10-17)
 
-🎉 **Tier 1 COMPLETE!** All 4 planned rules implemented.
+⚠️ **Tier 1 Status: IMPLEMENTED, RED TEAM TESTING IN PROGRESS**
+
+**Note (2025-10-20):** Rules are implemented and pass unit tests, but red team validation revealed critical gaps in real-world usability (silent failures on compilation errors, no compile_commands.json support). See [RED-TEAM-TESTING.md](RED-TEAM-TESTING.md) for full assessment.
 
 ---
 
@@ -569,7 +619,7 @@ See [RULES-ROADMAP.md](RULES-ROADMAP.md) for detailed rule expansion plan.
 - All returns: Either return by value or return references to members/parameters
 - No dangling references in src/
 
-**Tier 1 Complete:** 5 core safety rules operational (Ownership, Bounds, Type, Lifetime)
+**Tier 1 Status:** 5 core safety rules implemented (Ownership, Bounds, Type, Lifetime) - Red team validation pending
 
 ---
 
