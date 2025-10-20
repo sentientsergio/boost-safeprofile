@@ -4,6 +4,68 @@
 
 ---
 
+## 🚀 Quick Start (For New AI Sessions)
+
+**Last Updated:** 2025-10-20 (Red Team Sprint 1 complete)
+
+### Current State
+- **Version:** v0.4.0-dev (Tier 1 implemented)
+- **Status:** 5 core rules working, red team blockers fixed
+- **Working:** Self-contained C++ code analysis
+- **Partial:** Code with system includes (needs compile_commands.json)
+- **Tests:** 34 unit tests passing, 0 self-conformance violations
+
+### What Works ✅
+- SP-OWN-001/002 (naked new/delete)
+- SP-BOUNDS-001 (C-style arrays)
+- SP-TYPE-001 (C-style casts)
+- SP-LIFE-003 (dangling references)
+- SARIF 2.1.0 output
+- Explicit error reporting (no silent failures)
+- compile_commands.json infrastructure
+
+### Known Issues ⚠️
+- System include resolution needs refinement
+- 3 unit tests fail (expected - they use system headers)
+- No HTML reports yet
+- No Git/remote repository support yet
+
+### Key Files to Read First
+1. [RED-TEAM-SPRINT-1.md](RED-TEAM-SPRINT-1.md) - Latest work summary
+2. [RED-TEAM-TESTING.md](RED-TEAM-TESTING.md) - Mandatory testing protocol
+3. [RULES-ROADMAP.md](RULES-ROADMAP.md) - What to implement next
+4. [README.md](README.md) - User-facing capabilities (keep this accurate!)
+
+### Build & Test Commands
+```bash
+# Build
+mkdir build && cd build && cmake .. && cmake --build .
+
+# Unit tests
+./build/tests/unit_tests
+
+# Self-test (should be 0 violations)
+./build/boost-safeprofile --sarif test.sarif src/
+
+# Demo (should find 15 violations)
+./build/boost-safeprofile demo/
+
+# Error handling test
+./build/boost-safeprofile tests/fixtures/compile-errors/
+# Should report compilation failures, exit code 2
+```
+
+### Next Sprint Options
+1. **Tier 2 Rules** - Implement SP-OWN-003, SP-OWN-004, SP-BOUNDS-003, SP-TYPE-002/003
+2. **Real-World Testing** - Test on actual Boost library (e.g., Boost.JSON)
+3. **CI Integration** - GitHub Actions with unit tests + self-test
+4. **HTML Reports** - Generate human-readable findings report
+5. **System Includes** - Refine compile_commands.json handling
+
+**Recommendation:** Before claiming any feature is "complete", run red team testing!
+
+---
+
 ## Project Identity
 
 **Boost.SafeProfile** is a candidate Boost developer tool for analyzing C++ codebases against WG21 Safety Profiles. It produces actionable findings, suggests fixes, and generates auditable evidence packs.
