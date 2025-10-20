@@ -55,14 +55,38 @@ mkdir build && cd build && cmake .. && cmake --build .
 # Should report compilation failures, exit code 2
 ```
 
-### Next Sprint Options
-1. **Tier 2 Rules** - Implement SP-OWN-003, SP-OWN-004, SP-BOUNDS-003, SP-TYPE-002/003
-2. **Real-World Testing** - Test on actual Boost library (e.g., Boost.JSON)
-3. **CI Integration** - GitHub Actions with unit tests + self-test
-4. **HTML Reports** - Generate human-readable findings report
-5. **System Includes** - Refine compile_commands.json handling
+### Next Sprint (Agreed 2025-10-20)
 
-**Recommendation:** Before claiming any feature is "complete", run red team testing!
+**Decision:** Priority 2 (Real-World Validation + CI) before adding more rules
+
+**Rationale:**
+- Validate infrastructure before expanding rule count
+- Real-world testing will reveal gaps that inform future rule design
+- CI is a force multiplier - automate testing before adding complexity
+- 5 rules that provably work > 10 rules that might not work on real projects
+
+**Sprint Plan:**
+1. **Real-World Validation** (8-10 hours)
+   - Test on small real project (Boost.JSON or nlohmann/json)
+   - Document results honestly (case study)
+   - Fix any blocking issues discovered
+   - Prove infrastructure works or document limitations
+
+2. **CI Integration** (6-8 hours)
+   - GitHub Actions: build + unit tests + self-test
+   - Multi-platform (Ubuntu + macOS initially)
+   - Baseline tracking for self-test
+   - README badges
+
+3. **Optional: HTML Reports** (4-6 hours if time permits)
+
+**After validation, then expand rules:**
+- Quick wins: SP-TYPE-002 (reinterpret_cast), SP-TYPE-003 (const_cast)
+- Complex: SP-OWN-003/004 (ownership analysis, control flow)
+
+**Key Principle:** Confidence compounds. Validate each layer before building the next.
+
+**Reminder:** Before claiming any feature is "complete", run red team testing!
 
 ---
 
