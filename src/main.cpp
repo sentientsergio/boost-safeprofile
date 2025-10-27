@@ -66,6 +66,75 @@ int main(int argc, char* argv[]) {
         // Set compilation database if loaded
         if (compile_db->is_loaded()) {
             ast_det.set_compilation_database(compile_db);
+        } else {
+            // No compilation database - infer include paths from analyzed directory
+            // This helps analyze projects without needing a full build
+            std::vector<std::string> inferred_includes;
+
+            // Add the target directory itself (for relative includes)
+            boost::filesystem::path target_abs = boost::filesystem::absolute(args->target_path);
+            inferred_includes.push_back(target_abs.string());
+
+            // If analyzing within an 'include/' directory, also add parent
+            // (supports common pattern: boost-json/include/boost/json/...)
+            if (target_abs.filename() == "include") {
+                inferred_includes.push_back(target_abs.parent_path().string());
+            }
+            // If inside a subdirectory of 'include/', add the include root
+            else {
+                auto parent = target_abs.parent_path();
+                while (!parent.empty() && parent != parent.parent_path()) {
+                    if (parent.filename() == "include") {
+                        inferred_includes.push_back(parent.string());
+                        break;
+                    }
+                    parent = parent.parent_path();
+                }
+            }
+
+            // Auto-detect Boost headers (for analyzing Boost libraries)
+            // Check common system install locations
+            std::vector<boost::filesystem::path> boost_search_paths = {
+                "/opt/homebrew/include",               // macOS Homebrew
+                "/usr/local/include",                  // Standard Unix/Linux
+                "/usr/include",                        // Debian/Ubuntu
+                boost::filesystem::path(getenv("HOME") ? getenv("HOME") : "") / ".local/include"  // User install
+            };
+
+            boost::filesystem::path boost_root;
+            for (const auto& search_path : boost_search_paths) {
+                if (boost::filesystem::exists(search_path / "boost" / "config.hpp")) {
+                    // System install (boost/ directory at root)
+                    boost_root = search_path;
+                    inferred_includes.push_back(boost_root.string());
+                    break;
+                } else if (boost::filesystem::exists(search_path / "libs" / "config" / "include" / "boost" / "config.hpp")) {
+                    // Boost super-project layout (libs/*/include/)
+                    boost_root = search_path;
+                    // Add all libs/*/include directories
+                    if (boost::filesystem::exists(boost_root / "libs")) {
+                        boost::filesystem::directory_iterator end_iter;
+                        for (boost::filesystem::directory_iterator lib_iter(boost_root / "libs"); lib_iter != end_iter; ++lib_iter) {
+                            if (boost::filesystem::is_directory(lib_iter->status())) {
+                                auto include_dir = lib_iter->path() / "include";
+                                if (boost::filesystem::exists(include_dir)) {
+                                    inferred_includes.push_back(include_dir.string());
+                                }
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+
+            if (!inferred_includes.empty()) {
+                ast_det.set_additional_include_paths(inferred_includes);
+                std::cout << "Inferred include path(s):\n";
+                if (!boost_root.empty()) {
+                    std::cout << "  Found Boost headers at: " << boost_root.string() << "\n";
+                }
+                std::cout << "  Total: " << inferred_includes.size() << " include path(s)\n\n";
+            }
         }
 
         // Extract file paths from sources

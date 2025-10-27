@@ -629,11 +629,35 @@ std::vector<ast_finding> ast_detector::analyze_files(
 }
 
 std::vector<std::string> ast_detector::get_default_compiler_args() const {
-    return {
+    std::vector<std::string> args = {
         "-std=c++20",
         "-fsyntax-only",
-        "-Wno-everything"  // Suppress warnings, we only want AST
+        "-Wno-everything",        // Suppress warnings, we only want AST
+        "-ferror-limit=100",      // Allow more errors before stopping
+        "-fno-caret-diagnostics", // Reduce diagnostic noise
+        "-nostdinc++"             // CRITICAL: Disable default C++ includes (prevents SDK C++ headers from mixing with Homebrew's)
     };
+
+    // Add Homebrew's libc++ headers ONLY (using -isystem for system headers)
+    // This ensures we use a single, consistent C++ standard library implementation
+    args.push_back("-isystem");
+    args.push_back("/opt/homebrew/opt/llvm/include/c++/v1");
+
+    // Add Clang builtin headers (compiler intrinsics)
+    args.push_back("-isystem");
+    args.push_back("/opt/homebrew/opt/llvm/lib/clang/21/include");
+
+    // Add macOS SDK for C headers only (unistd.h, stdlib.h, etc.)
+    // -nostdinc++ allows these C headers while blocking C++ SDK headers
+    args.push_back("-isysroot");
+    args.push_back("/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk");
+
+    // Add any additional include paths (e.g., inferred Boost headers from analyzed directory)
+    for (const auto& include_path : additional_include_paths_) {
+        args.push_back("-I" + include_path);
+    }
+
+    return args;
 }
 
 std::vector<std::string> ast_detector::build_compiler_args(
@@ -654,9 +678,16 @@ std::vector<std::string> ast_detector::build_compiler_args(
         args.push_back("-D" + define);
     }
 
+    // Additional include paths (inferred from analyzed directory)
+    for (const auto& include_path : additional_include_paths_) {
+        args.push_back("-I" + include_path);
+    }
+
     // Always add these
     args.push_back("-fsyntax-only");
     args.push_back("-Wno-everything");
+    args.push_back("-ferror-limit=100");
+    args.push_back("-fno-caret-diagnostics");
 
     return args;
 }

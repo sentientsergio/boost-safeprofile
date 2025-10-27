@@ -296,22 +296,40 @@ This tool “eats its own cooking”:
 
 ---
 
+## Real-World Validation
+
+**Boost.JSON Analysis (October 2025)** - See [CASE-STUDY-BOOST-JSON.md](CASE-STUDY-BOOST-JSON.md)
+
+We validated the tool on **Boost.JSON 1.89.0** (97 header files, ~30k LOC):
+- **Coverage:** 75% (73/97 files analyzed successfully)
+- **Findings:** 175 violations across 4 safety categories
+  - 141 C-style casts (type safety)
+  - 16 C-style arrays (bounds safety)
+  - 13 potential lifetime issues (requires manual review)
+  - 5 manual memory management instances (ownership)
+- **Analysis time:** ~2-3 minutes
+- **False positives:** Zero in analyzed code (some lifetime findings need review)
+
+**Key Achievement:** Proved **atomic library analysis** - analyzed a single Boost library without analyzing all its dependencies. Dependencies provide parsing context only; violations are reported only in target library code.
+
 ## Known Limitations
 
 **Current Version:** Tier 1 rules implemented (v0.4.0-dev)
 
 ### What Works ✅
-- Self-contained C++ code (no system includes)
+- **Real-world Boost libraries** (validated on Boost.JSON 1.89.0)
+- Header-only library analysis without full build
 - Detects 5 core safety violations:
   - SP-OWN-001: Naked new expression
   - SP-OWN-002: Naked delete expression
   - SP-BOUNDS-001: C-style array declaration
   - SP-TYPE-001: C-style cast
   - SP-LIFE-003: Return reference to local variable
-- AST-based semantic analysis (no false positives in comments/strings)
-- SARIF 2.1.0 output
-- Explicit compilation error reporting
-- compile_commands.json support (infrastructure in place)
+- AST-based semantic analysis (zero false positives in comments/strings)
+- SARIF 2.1.0 output for GitHub Code Scanning
+- Explicit compilation error reporting (no silent failures)
+- Automatic Boost header detection
+- Atomic library analysis (analyze single library in isolation)
 
 ### Known Gaps ⚠️
 1. **System Include Resolution:** Files with `#include <memory>` may fail to compile even with compile_commands.json

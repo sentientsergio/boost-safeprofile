@@ -48,6 +48,12 @@ public:
         compile_db_ = db;
     }
 
+    /// Set additional include paths to use when no compilation database is available
+    /// Typically used to infer include paths from the analyzed directory
+    void set_additional_include_paths(const std::vector<std::string>& paths) {
+        additional_include_paths_ = paths;
+    }
+
     /// Analyze a single source file using AST
     /// Returns result with success status and findings (or error message)
     file_analysis_result analyze_file(
@@ -74,6 +80,7 @@ public:
 
 private:
     std::shared_ptr<intake::compile_commands_reader> compile_db_;
+    std::vector<std::string> additional_include_paths_;  // Inferred include paths
 
     /// Build default compiler arguments if no compilation database available
     std::vector<std::string> get_default_compiler_args() const;
